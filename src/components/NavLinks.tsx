@@ -13,16 +13,14 @@ function isActive(href: string, currentPath: string): boolean {
 
 export function NavLinks({ currentPath }: { currentPath: string }) {
   return (
-    <nav aria-label="Main">
-      <ul>
-        {navItems.map((item) => (
-          <li key={item.href}>
-            <Link href={item.href} aria-current={isActive(item.href, currentPath) ? "page" : undefined}>
-              {item.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
+    <ul>
+      {navItems.map((item) => (
+        <li key={item.href}>
+          <Link href={item.href} aria-current={isActive(item.href, currentPath) ? "page" : undefined}>
+            {item.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

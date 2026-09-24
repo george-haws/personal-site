@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <header>
-          <nav aria-label="Site">
+          <nav aria-label="Main">
             <ul>
               <li>
                 <Link href="/">
@@ -23,8 +23,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </Link>
               </li>
             </ul>
+            <Nav />
           </nav>
-          <Nav />
         </header>
         <main>{children}</main>
         <footer>
