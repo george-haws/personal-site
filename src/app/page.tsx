@@ -21,7 +21,7 @@ export default function Home() {
       {featured.length > 0 ? (
         <section>
           <h2>Featured projects</h2>
-          <div className="grid">
+          <div>
             {featured.map((project) => (
               <ProjectCard key={project.title} project={project} />
             ))}

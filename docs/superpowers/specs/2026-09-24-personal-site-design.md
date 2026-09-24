@@ -88,8 +88,9 @@ setting and styling for the active nav link via `aria-current`.
 
 Rules that keep the overhaul cheap later:
 
-- No `className` on any element, with one exception: Pico's own `grid`
-  helper for laying out project cards side by side.
+- No `className` on any element. Project cards stack vertically; Pico's
+  classless build has no grid helper, and a grid is a job for the future
+  styling overhaul.
 - No custom CSS files. No `next/font`. No Tailwind.
 - If a visual need cannot be met by semantic HTML, prefer a more
   specific element (`small`, `code`, `kbd`, `dl`) over a class.

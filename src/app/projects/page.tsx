@@ -11,7 +11,7 @@ export default function ProjectsPage() {
   return (
     <>
       <h1>Projects</h1>
-      <div className="grid">
+      <div>
         {projects.map((project) => (
           <ProjectCard key={project.title} project={project} />
         ))}
