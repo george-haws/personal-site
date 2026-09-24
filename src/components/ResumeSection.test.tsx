@@ -23,9 +23,11 @@ describe("ExperienceEntry", () => {
     expect(screen.getByText("Go")).toBeInTheDocument();
   });
 
-  it("keeps spaces around the separator between company and location", () => {
+  it("keeps a word boundary between company and location for assistive tech", () => {
     render(<ExperienceEntry entry={current} />);
-    expect(screen.getByText("Acme").parentElement).toHaveTextContent(/^Acme · Remote$/);
+    const line = screen.getByText("Acme").parentElement!.cloneNode(true) as HTMLElement;
+    line.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.remove());
+    expect(line.textContent!.replace(/\s+/g, " ").trim()).toBe("Acme Remote");
   });
 
   it("shows Present when there is no end date", () => {
