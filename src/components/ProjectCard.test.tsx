@@ -21,6 +21,11 @@ describe("ProjectCard", () => {
     expect(screen.getByText("SQLite")).toBeInTheDocument();
   });
 
+  it("separates tech tags with spaces", () => {
+    render(<ProjectCard project={base} />);
+    expect(screen.getByText("Go").parentElement).toHaveTextContent(/^Go SQLite$/);
+  });
+
   it("renders no links when no URLs are present", () => {
     render(<ProjectCard project={base} />);
     expect(screen.queryAllByRole("link")).toHaveLength(0);

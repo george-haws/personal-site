@@ -9,8 +9,8 @@ export function ExperienceEntry({ entry }: { entry: Experience }) {
         <hgroup>
           <h3>{entry.role}</h3>
           <p>
-            <span>{entry.company}</span>
-            <span aria-hidden="true"> · </span>
+            <span>{entry.company}</span>{" "}
+            <span aria-hidden="true">·</span>{" "}
             <span>{entry.location}</span>
           </p>
         </hgroup>

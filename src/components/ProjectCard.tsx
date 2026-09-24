@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Project } from "@/lib/types";
 
 export function ProjectCard({ project }: { project: Project }) {
@@ -15,8 +16,11 @@ export function ProjectCard({ project }: { project: Project }) {
       ) : null}
       <p>{project.description}</p>
       <p>
-        {project.tech.map((tag) => (
-          <code key={tag}>{tag}</code>
+        {project.tech.map((tag, i) => (
+          <Fragment key={tag}>
+            {i > 0 ? " " : null}
+            <code>{tag}</code>
+          </Fragment>
         ))}
       </p>
       {hasLinks ? (
@@ -26,7 +30,12 @@ export function ProjectCard({ project }: { project: Project }) {
               Source
             </a>
           ) : null}
-          {project.repoUrl && project.liveUrl ? " · " : null}
+          {project.repoUrl && project.liveUrl ? (
+            <>
+              {" "}
+              <span aria-hidden="true">·</span>{" "}
+            </>
+          ) : null}
           {project.liveUrl ? (
             <a href={project.liveUrl} target="_blank" rel="noopener noreferrer">
               Live

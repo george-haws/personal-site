@@ -23,6 +23,11 @@ describe("ExperienceEntry", () => {
     expect(screen.getByText("Go")).toBeInTheDocument();
   });
 
+  it("keeps spaces around the separator between company and location", () => {
+    render(<ExperienceEntry entry={current} />);
+    expect(screen.getByText("Acme").parentElement).toHaveTextContent(/^Acme · Remote$/);
+  });
+
   it("shows Present when there is no end date", () => {
     render(<ExperienceEntry entry={current} />);
     expect(screen.getByText("Mar 2021 – Present")).toBeInTheDocument();
