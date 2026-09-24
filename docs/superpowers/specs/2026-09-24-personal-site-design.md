@@ -9,6 +9,8 @@ A personal site for a software engineer with 15 years of experience: an
 about page, a resume, and a projects list. Minimize cost. The only
 recurring expense is the domain the owner already holds; hosting is free.
 
+Source is hosted at https://github.com/george-haws/personal-site (public).
+
 Writing (blog posts) and a playground for interactive demos are
 deliberately out of scope for this version. The structure leaves an
 obvious place for each so adding them later is additive, not a
@@ -20,7 +22,7 @@ restructure.
 |---|---|---|
 | Framework | Next.js, App Router, TypeScript | Owner's preference; keeps a future server mode available |
 | Rendering | Static export (`output: 'export'`) | No runtime, deployable anywhere for free |
-| Styling | Tailwind CSS | Default tooling, no runtime cost in a static build |
+| Styling | Pico CSS, classless build; no CSS framework of our own | Out-of-the-box skin on bare semantic HTML; a future overhaul is a stylesheet swap, not a component rewrite |
 | Content | Typed TypeScript data files | Edits are type-checked; no CMS or content pipeline to run |
 | Hosting | Cloudflare Workers static assets, Git integration | Free, unlimited bandwidth, preview deploys per branch, backend path later |
 | Domain | Owner's existing domain via CNAME | No new cost |
@@ -47,30 +49,53 @@ which is fine for a handful of small assets.
 personal-site/
   src/
     app/
-      layout.tsx          # shell: header nav, footer, default metadata
+      layout.tsx          # shell: header nav, footer, default metadata, Pico import
       page.tsx            # home / about
       resume/page.tsx
       projects/page.tsx
       not-found.tsx       # branded 404
-      globals.css
     components/
-      Nav.tsx
+      NavLinks.tsx        # pure nav list, takes currentPath
+      Nav.tsx             # client wrapper around NavLinks (reads usePathname)
+      SocialLinks.tsx
       ProjectCard.tsx
-      ResumeSection.tsx   # one experience entry or one skill group
+      ResumeSection.tsx   # ExperienceEntry and SkillGroups
     data/
       site.ts             # name, tagline, bio, social links
       resume.ts           # experience entries and skill groups
       projects.ts         # project list
     lib/
       types.ts            # SiteInfo, Experience, SkillGroup, Project
+      dates.ts            # formatMonth, formatDateRange
+      resume.ts           # sortByStartDesc
   public/                 # favicon, headshot, resume.pdf (optional)
   next.config.ts
-  tailwind.config.ts
+  wrangler.jsonc
   package.json
 ```
 
 Future additions slot in without touching the above: `content/posts/`
 plus `src/app/writing/` for writing; `src/app/playground/` for demos.
+
+## Styling
+
+The site is intentionally unstyled by us. Components emit semantic
+HTML (`header`, `nav`, `main`, `article`, `dl`, `footer`, headings,
+lists) with no class names, and the classless build of Pico CSS
+(`@picocss/pico/css/pico.classless.min.css`, imported once in the root
+layout) provides the look, including automatic dark mode from the OS
+setting and styling for the active nav link via `aria-current`.
+
+Rules that keep the overhaul cheap later:
+
+- No `className` on any element, with one exception: Pico's own `grid`
+  helper for laying out project cards side by side.
+- No custom CSS files. No `next/font`. No Tailwind.
+- If a visual need cannot be met by semantic HTML, prefer a more
+  specific element (`small`, `code`, `kbd`, `dl`) over a class.
+
+Overhauling later means removing the Pico import and adding whatever
+styling system is chosen then. The markup stays.
 
 ## Content model
 
@@ -103,21 +128,27 @@ their own segment.
 
 ## Components
 
-- **Nav**: renders the three routes; marks the current route as active.
-- **ProjectCard**: renders title, summary, tech tags; renders repo and
-  live links only when the corresponding URL is present.
-- **ResumeSection**: renders one experience entry (date range, with
-  "Present" when `end` is absent) or one skill group.
+- **NavLinks**: pure; renders the three routes and sets
+  `aria-current="page"` on the current one. **Nav** is the client
+  wrapper that reads the pathname and renders NavLinks.
+- **SocialLinks**: renders only the links present in `SiteInfo.links`.
+- **ProjectCard**: renders title, summary, description, tech tags;
+  renders repo and live links only when the corresponding URL is
+  present; renders an image only when one is given.
+- **ResumeSection**: exports `ExperienceEntry` (date range, with
+  "Present" when `end` is absent) and `SkillGroups`.
 
 ## Build and deployment
 
-- Repository on GitHub. Cloudflare Git integration builds on every push.
-- Build command: `npm run build` (runs `next build`; export writes
-  `out/`). Output directory: `out`. Production branch: `main`; other
-  branches get preview URLs.
+- Repository: https://github.com/george-haws/personal-site. Cloudflare
+  Git integration builds on every push.
+- Cloudflare build command: `npm run check && npm run build`. Deploy
+  command: `npx wrangler deploy` (reads `wrangler.jsonc`, which points
+  at `out/`). Production branch: `main`; other branches get preview
+  URLs.
 - Deploy as a Cloudflare Workers static-assets project. If the dashboard
-  makes Cloudflare Pages the simpler path on setup day, use it; the
-  build settings are identical and both are free.
+  makes Cloudflare Pages the simpler path on setup day, use it with
+  output directory `out`; both are free.
 - Custom domain: CNAME from the owner's domain to the deployment.
   Cloudflare provisions the certificate.
 - Local development: `npm install`, `npm run dev`. No environment
@@ -131,14 +162,15 @@ no auth). What remains is content mistakes and build breakage.
 - **Types**: malformed content (missing title, bad date shape) fails
   `tsc` before it reaches a deploy.
 - **Unit tests** (Vitest + React Testing Library) on pure rendering
-  rules:
+  rules and helpers:
+  - `formatDateRange` and `sortByStartDesc`.
   - `ProjectCard` renders links only for URLs that are present.
-  - `ResumeSection` renders "Present" for a missing end date and formats
-    the date range.
-  - `Nav` marks the current route active.
-- **Build gate**: `npm run build` includes typecheck and lint. A failed
-  build leaves the previous deploy live; a bad push cannot take the site
-  down.
+  - `ExperienceEntry` renders "Present" for a missing end date.
+  - `NavLinks` marks the current route with `aria-current`.
+  - `SocialLinks` renders only present links.
+- **Build gate**: Cloudflare runs `npm run check` (typecheck, lint,
+  tests) before `npm run build`. A failure leaves the previous deploy
+  live; a bad push cannot take the site down.
 - **404**: handled by `not-found.tsx`.
 
 ## Cost
@@ -155,6 +187,7 @@ no auth). What remains is content mistakes and build breakage.
 - Playground / interactive demos.
 - Analytics. (Cloudflare Web Analytics is free and can be added later
   with one script tag.)
-- Dark mode toggle. (Tailwind's `dark:` variant following the OS setting
-  is acceptable if it falls out naturally; a manual toggle is not.)
+- Custom visual design. Pico's defaults are the design until the
+  overhaul. Dark mode comes from Pico following the OS setting; no
+  manual toggle.
 - Contact form. (Email link only.)

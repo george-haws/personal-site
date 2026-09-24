@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a statically exported Next.js personal site with home/about, resume, and projects pages, deployable for free on Cloudflare.
+**Goal:** Build a statically exported Next.js personal site with home/about, resume, and projects pages, styled only by Pico CSS, deployable for free on Cloudflare from https://github.com/george-haws/personal-site.
 
-**Architecture:** One Next.js App Router app with `output: 'export'`. Three layers with one-way dependencies: typed data files in `src/data` know nothing about rendering; components in `src/components` take data as props; pages in `src/app` wire the two together and export metadata. Pure helpers (date formatting, sorting) live in `src/lib` and are unit tested.
+**Architecture:** One Next.js App Router app with `output: 'export'`. Three layers with one-way dependencies: typed data files in `src/data` know nothing about rendering; components in `src/components` take data as props and emit bare semantic HTML; pages in `src/app` wire the two together and export metadata. Pure helpers (date formatting, sorting) live in `src/lib` and are unit tested. Pico's classless stylesheet, imported once in the root layout, is the entire visual design.
 
-**Tech Stack:** Next.js 16.3 (App Router, static export), React 19, TypeScript 5, Tailwind CSS 4, Vitest 5 + React Testing Library 16, Cloudflare Workers static assets via Git integration.
+**Tech Stack:** Next.js 16.3 (App Router, static export), React 19, TypeScript 5, Pico CSS 2.1 (classless build), Vitest 5 + React Testing Library 16, Cloudflare Workers static assets via Git integration.
 
 **Spec:** `docs/superpowers/specs/2026-09-24-personal-site-design.md`
 
@@ -14,7 +14,7 @@
 
 - Node 24 locally (`node --version` → v24.x). Cloudflare build uses its default Node, which is 22 or newer; both work.
 - `@types/node` must be `^24` (Vitest 5 refuses `^20`, which create-next-app pins). Task 1 fixes this.
-- Tailwind 4: no `tailwind.config.ts`. Theme lives in `src/app/globals.css` under `@theme inline`. Dark mode follows the OS via the `dark:` variant; no manual toggle.
+- **No styling of our own.** No `className` on any element except Pico's `grid` helper on the card containers in Task 4. No CSS files. No `next/font`. No Tailwind. If markup needs a look, use a more specific semantic element (`small`, `code`, `dl`), not a class.
 - No server runtime, no API routes, no `next/image` (static export). Use plain `<img>` for any images under `public/`.
 - Dates in data are `YYYY-MM` strings. A missing `end` means current.
 - Path alias `@/*` maps to `src/*`.
@@ -46,35 +46,36 @@
 | `src/components/SocialLinks.tsx` | Renders only the links present in `SiteInfo.links` (tested) |
 | `src/components/ProjectCard.tsx` | One project; links only when URLs present (tested) |
 | `src/components/ResumeSection.tsx` | `ExperienceEntry` and `SkillGroups` (tested) |
-| `src/app/layout.tsx` | Shell: header with Nav, footer with SocialLinks, title template |
+| `src/app/layout.tsx` | Shell: Pico import, header with Nav, footer with SocialLinks, title template |
 | `src/app/page.tsx` | Home: bio, social links, featured projects |
 | `src/app/resume/page.tsx` | Sorted experience, skill groups, optional PDF link |
 | `src/app/projects/page.tsx` | All projects |
 | `src/app/not-found.tsx` | Branded 404 |
-| `README.md` | Local dev and Cloudflare deploy instructions |
+| `README.md` | Local dev, content editing, and Cloudflare deploy instructions |
 
 ---
 
-### Task 1: Scaffold, static export, and test toolchain
+### Task 1: Scaffold, static export, Pico, and test toolchain
 
 **Files:**
 - Create: everything `create-next-app` generates, plus `vitest.config.mts`, `vitest.setup.ts`, `src/lib/smoke.test.ts`
-- Modify: `next.config.ts`, `package.json`, `src/app/page.tsx`
+- Modify: `next.config.ts`, `package.json`, `src/app/page.tsx`, `src/app/layout.tsx`
+- Delete: `src/app/globals.css`, `src/app/page.module.css`, template SVGs in `public/`
 
 **Interfaces:**
 - Consumes: nothing
-- Produces: npm scripts `dev`, `build`, `lint`, `typecheck`, `test`, `check`; a working Vitest + RTL + jsdom setup with `@/` alias; `out/` produced by `npm run build`
+- Produces: npm scripts `dev`, `build`, `lint`, `typecheck`, `test`, `check`; a working Vitest + RTL + jsdom setup with `@/` alias; Pico imported in the root layout; `out/` produced by `npm run build`
 
 - [ ] **Step 1: Scaffold Next.js into the current directory**
 
-The directory already contains `.git` and `docs/`, both of which create-next-app tolerates.
+The directory already contains `.git` and `docs/`, both of which create-next-app tolerates. The `--no-tailwind` flag is deliberate.
 
 ```bash
 cd /Users/george/src/personal-site
-npx --yes create-next-app@16 . --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --turbopack --disable-git
+npx --yes create-next-app@16 . --ts --no-tailwind --eslint --app --src-dir --import-alias "@/*" --turbopack --disable-git
 ```
 
-Expected: "Success! Created personal-site at /Users/george/src/personal-site". Then `npm install` has run and `src/app/page.tsx`, `src/app/layout.tsx`, `next.config.ts`, `eslint.config.mjs`, `postcss.config.mjs` exist.
+Expected: "Success! Created personal-site at /Users/george/src/personal-site". `npm install` has run and `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/globals.css`, `src/app/page.module.css`, `next.config.ts`, `eslint.config.mjs` exist. There is no `postcss.config.mjs` and no Tailwind in `package.json`.
 
 - [ ] **Step 2: Configure static export**
 
@@ -91,20 +92,36 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- [ ] **Step 3: Replace the template home page with a stub that does not use next/image**
+- [ ] **Step 3: Install Pico and replace the template layout and page**
 
-The template `src/app/page.tsx` imports `next/image` and template SVGs. Replace the whole file:
+```bash
+npm install @picocss/pico@^2
+rm src/app/globals.css src/app/page.module.css
+rm public/file.svg public/globe.svg public/next.svg public/vercel.svg public/window.svg
+```
+
+Replace `src/app/layout.tsx` entirely (a stub; Task 3 fills it in):
 
 ```tsx
-export default function Home() {
-  return <main className="p-8">Home</main>;
+import "@picocss/pico/css/pico.classless.min.css";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <main>{children}</main>
+      </body>
+    </html>
+  );
 }
 ```
 
-Delete the template assets:
+Replace `src/app/page.tsx` entirely (a stub; Task 4 fills it in):
 
-```bash
-rm public/file.svg public/globe.svg public/next.svg public/vercel.svg public/window.svg
+```tsx
+export default function Home() {
+  return <h1>Home</h1>;
+}
 ```
 
 - [ ] **Step 4: Install the test toolchain**
@@ -156,7 +173,7 @@ In `package.json`, replace the `scripts` block:
 }
 ```
 
-- [ ] **Step 7: Write a smoke test that proves the alias and jsdom work**
+- [ ] **Step 7: Write a smoke test that proves the toolchain works**
 
 Create `src/lib/smoke.test.ts`:
 
@@ -175,16 +192,16 @@ describe("test toolchain", () => {
 - [ ] **Step 8: Run the full check and build**
 
 ```bash
-npm run check && npm run build && ls out
+npm run check && npm run build && ls out && grep -l -- '--pico-' out/_next/static/chunks/*.css
 ```
 
-Expected: typecheck and lint print nothing and exit 0; Vitest reports `1 passed`; build prints a route table with `/` and `/_not-found`; `ls out` shows `index.html` and `404.html`.
+Expected: typecheck and lint print nothing and exit 0; Vitest reports `1 passed`; build prints a route table with `/` and `/_not-found`; `ls out` shows `index.html` and `404.html`; grep prints one CSS file path, proving Pico is in the bundle.
 
 - [ ] **Step 9: Commit**
 
 ```bash
 git add -A
-git commit -m "Scaffold Next.js static export with Vitest toolchain
+git commit -m "Scaffold Next.js static export with Pico and Vitest toolchain
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
@@ -250,7 +267,7 @@ export type Project = {
   title: string;
   /** One line, shown on cards. */
   summary: string;
-  /** Longer text, shown on the projects page. */
+  /** Longer text, shown on cards below the summary. */
   description: string;
   tech: string[];
   repoUrl?: string;
@@ -375,7 +392,7 @@ Expected: PASS, 1 test.
 
 - [ ] **Step 10: Add content data files**
 
-The values below are placeholders with the right shape. The site owner replaces them with real content; the types will catch any shape mistakes.
+The values below are placeholders with the right shape. The site owner replaces them with real content; the types will catch any shape mistakes. The repo is public, so nothing private goes here.
 
 Create `src/data/site.ts`:
 
@@ -387,7 +404,7 @@ export const site: SiteInfo = {
   tagline: "Software engineer. 15 years of building and running systems.",
   bio: "I build software and the systems that keep it running. This site collects my work history, side projects, and the occasional experiment.",
   links: {
-    github: "https://github.com/your-handle",
+    github: "https://github.com/george-haws",
     linkedin: "https://www.linkedin.com/in/your-handle",
     email: "you@example.com",
   },
@@ -453,7 +470,7 @@ export const projects: Project[] = [
     description:
       "Built to scratch a personal itch, then shared. Handles the common case in one command and stays out of the way otherwise.",
     tech: ["Go"],
-    repoUrl: "https://github.com/your-handle/example-tool",
+    repoUrl: "https://github.com/george-haws/example-tool",
     featured: true,
   },
   {
@@ -461,7 +478,7 @@ export const projects: Project[] = [
     summary: "A small web app with a live demo.",
     description: "A weekend project that turned into something I use every week.",
     tech: ["TypeScript", "React"],
-    repoUrl: "https://github.com/your-handle/example-web-app",
+    repoUrl: "https://github.com/george-haws/example-web-app",
     liveUrl: "https://example-web-app.pages.dev",
     featured: true,
   },
@@ -499,7 +516,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Files:**
 - Create: `src/components/NavLinks.tsx`, `src/components/NavLinks.test.tsx`, `src/components/Nav.tsx`, `src/components/SocialLinks.tsx`, `src/components/SocialLinks.test.tsx`, `src/app/not-found.tsx`
-- Modify: `src/app/layout.tsx`, `src/app/globals.css`
+- Modify: `src/app/layout.tsx`
 
 **Interfaces:**
 - Consumes: `site` from `@/data/site`; `SocialLinks` type from `@/lib/types`
@@ -548,6 +565,8 @@ Expected: FAIL, "Failed to resolve import "@/components/NavLinks"".
 
 - [ ] **Step 3: Implement NavLinks and Nav**
 
+Pico styles `a[aria-current]` on its own, so the active link needs no class.
+
 Create `src/components/NavLinks.tsx`:
 
 ```tsx
@@ -567,25 +586,14 @@ function isActive(href: string, currentPath: string): boolean {
 export function NavLinks({ currentPath }: { currentPath: string }) {
   return (
     <nav aria-label="Main">
-      <ul className="flex gap-6">
-        {navItems.map((item) => {
-          const active = isActive(item.href, currentPath);
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={
-                  active
-                    ? "font-semibold underline underline-offset-4"
-                    : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-                }
-              >
-                {item.label}
-              </Link>
-            </li>
-          );
-        })}
+      <ul>
+        {navItems.map((item) => (
+          <li key={item.href}>
+            <Link href={item.href} aria-current={isActive(item.href, currentPath) ? "page" : undefined}>
+              {item.label}
+            </Link>
+          </li>
+        ))}
       </ul>
     </nav>
   );
@@ -661,12 +669,11 @@ export function SocialLinks({ links }: { links: SocialLinksType }) {
   if (items.length === 0) return null;
 
   return (
-    <ul className="flex gap-4">
+    <ul>
       {items.map((item) => (
         <li key={item.label}>
           <a
             href={item.href}
-            className="underline underline-offset-4 hover:text-neutral-600 dark:hover:text-neutral-300"
             {...(item.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
           >
             {item.label}
@@ -685,19 +692,17 @@ Expected: PASS, 3 tests.
 
 - [ ] **Step 9: Replace the root layout**
 
+Pico's classless build styles `body > header`, `body > main`, and `body > footer` as centered containers, and a `nav` containing two `ul`s as a left/right bar. That is the whole layout.
+
 Replace `src/app/layout.tsx` entirely:
 
 ```tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { SocialLinks } from "@/components/SocialLinks";
 import { site } from "@/data/site";
-import "./globals.css";
-
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+import "@picocss/pico/css/pico.classless.min.css";
 
 export const metadata: Metadata = {
   title: { default: site.name, template: `%s · ${site.name}` },
@@ -706,22 +711,26 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
-        <header className="border-b border-neutral-200 dark:border-neutral-800">
-          <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
-            <Link href="/" className="font-semibold">
-              {site.name}
-            </Link>
-            <Nav />
-          </div>
+    <html lang="en">
+      <body>
+        <header>
+          <nav aria-label="Site">
+            <ul>
+              <li>
+                <Link href="/">
+                  <strong>{site.name}</strong>
+                </Link>
+              </li>
+            </ul>
+          </nav>
+          <Nav />
         </header>
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">{children}</main>
-        <footer className="border-t border-neutral-200 dark:border-neutral-800">
-          <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-6 text-sm">
-            <span>© {new Date().getFullYear()} {site.name}</span>
-            <SocialLinks links={site.links} />
-          </div>
+        <main>{children}</main>
+        <footer>
+          <small>
+            © {new Date().getFullYear()} {site.name}
+          </small>
+          <SocialLinks links={site.links} />
         </footer>
       </body>
     </html>
@@ -729,21 +738,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-- [ ] **Step 10: Set the base font in globals.css**
-
-In `src/app/globals.css`, change the `body` rule's `font-family` line from `Arial, Helvetica, sans-serif` to use the Geist variable:
-
-```css
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
-}
-```
-
-Leave the rest of the file (the `@import`, `:root`, `@theme inline`, and dark-mode block) as generated.
-
-- [ ] **Step 11: Add the 404 page**
+- [ ] **Step 10: Add the 404 page**
 
 Create `src/app/not-found.tsx`:
 
@@ -752,18 +747,18 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Page not found</h1>
+    <>
+      <h1>Page not found</h1>
       <p>There is nothing at this address.</p>
-      <Link href="/" className="underline underline-offset-4">
-        Back to the home page
-      </Link>
-    </div>
+      <p>
+        <Link href="/">Back to the home page</Link>
+      </p>
+    </>
   );
 }
 ```
 
-- [ ] **Step 12: Run the full check and build, then look at it**
+- [ ] **Step 11: Run the full check and build, then look at it**
 
 ```bash
 npm run check && npm run build
@@ -771,9 +766,9 @@ npm run check && npm run build
 
 Expected: typecheck and lint exit 0; Vitest reports 10 tests passed across 4 files; the build route table lists `/` and `/_not-found`.
 
-Then run `npm run dev`, open http://localhost:3000, confirm the header shows the site name and three nav links with "About" underlined, the footer shows GitHub, LinkedIn, and Email links, and http://localhost:3000/nope shows the 404 page. Stop the dev server.
+Then run `npm run dev`, open http://localhost:3000, confirm the header shows the site name and three nav links with "About" visibly marked active, the footer shows GitHub, LinkedIn, and Email links, the page follows the OS light/dark setting, and http://localhost:3000/nope shows the 404 page. Stop the dev server.
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add -A
@@ -853,41 +848,46 @@ Expected: FAIL, "Failed to resolve import "@/components/ProjectCard"".
 
 - [ ] **Step 3: Implement ProjectCard**
 
+Pico styles `article` as a card with `header` and `footer` slots. Tech tags are `code` elements, which Pico renders as small chips.
+
 Create `src/components/ProjectCard.tsx`:
 
 ```tsx
 import type { Project } from "@/lib/types";
 
 export function ProjectCard({ project }: { project: Project }) {
+  const hasLinks = Boolean(project.repoUrl || project.liveUrl);
+
   return (
-    <article className="space-y-3 rounded-lg border border-neutral-200 p-5 dark:border-neutral-800">
+    <article>
+      <header>
+        <h3>{project.title}</h3>
+        <p>{project.summary}</p>
+      </header>
       {project.image ? (
         // eslint-disable-next-line @next/next/no-img-element -- static export, no image optimization
-        <img src={project.image} alt={project.title} className="w-full rounded" />
+        <img src={project.image} alt={project.title} />
       ) : null}
-      <h3 className="text-lg font-semibold">{project.title}</h3>
-      <p className="text-neutral-700 dark:text-neutral-300">{project.summary}</p>
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">{project.description}</p>
-      <ul className="flex flex-wrap gap-2 text-xs">
+      <p>{project.description}</p>
+      <p>
         {project.tech.map((tag) => (
-          <li key={tag} className="rounded bg-neutral-100 px-2 py-1 dark:bg-neutral-800">
-            {tag}
-          </li>
+          <code key={tag}>{tag}</code>
         ))}
-      </ul>
-      {project.repoUrl || project.liveUrl ? (
-        <div className="flex gap-4 text-sm">
+      </p>
+      {hasLinks ? (
+        <footer>
           {project.repoUrl ? (
-            <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
+            <a href={project.repoUrl} target="_blank" rel="noopener noreferrer">
               Source
             </a>
           ) : null}
+          {project.repoUrl && project.liveUrl ? " · " : null}
           {project.liveUrl ? (
-            <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
+            <a href={project.liveUrl} target="_blank" rel="noopener noreferrer">
               Live
             </a>
           ) : null}
-        </div>
+        </footer>
       ) : null}
     </article>
   );
@@ -900,6 +900,8 @@ Run: `npx vitest run src/components/ProjectCard.test.tsx`
 Expected: PASS, 4 tests.
 
 - [ ] **Step 5: Add the projects page**
+
+Pico's `grid` class is the one permitted class; it lays children out in equal columns and stacks them on narrow screens.
 
 Create `src/app/projects/page.tsx`:
 
@@ -915,14 +917,14 @@ export const metadata: Metadata = {
 
 export default function ProjectsPage() {
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Projects</h1>
-      <div className="grid gap-4 sm:grid-cols-2">
+    <>
+      <h1>Projects</h1>
+      <div className="grid">
         {projects.map((project) => (
           <ProjectCard key={project.title} project={project} />
         ))}
       </div>
-    </div>
+    </>
   );
 }
 ```
@@ -942,30 +944,30 @@ export default function Home() {
   const featured = projects.filter((p) => p.featured);
 
   return (
-    <div className="space-y-12">
-      <section className="space-y-4">
-        <h1 className="text-3xl font-semibold">{site.name}</h1>
-        <p className="text-lg text-neutral-700 dark:text-neutral-300">{site.tagline}</p>
+    <>
+      <section>
+        <hgroup>
+          <h1>{site.name}</h1>
+          <p>{site.tagline}</p>
+        </hgroup>
         <p>{site.bio}</p>
         <SocialLinks links={site.links} />
       </section>
 
       {featured.length > 0 ? (
-        <section className="space-y-4">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-xl font-semibold">Featured projects</h2>
-            <Link href="/projects" className="text-sm underline underline-offset-4">
-              All projects
-            </Link>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <section>
+          <h2>Featured projects</h2>
+          <div className="grid">
             {featured.map((project) => (
               <ProjectCard key={project.title} project={project} />
             ))}
           </div>
+          <p>
+            <Link href="/projects">All projects</Link>
+          </p>
         </section>
       ) : null}
-    </div>
+    </>
   );
 }
 ```
@@ -978,7 +980,7 @@ npm run check && npm run build
 
 Expected: typecheck and lint exit 0; Vitest reports 14 tests passed across 5 files; the build route table lists `/`, `/_not-found`, and `/projects`; `out/projects.html` exists.
 
-Then run `npm run dev` and confirm http://localhost:3000 shows the bio and two featured cards, and http://localhost:3000/projects shows three cards with "Projects" underlined in the nav. Stop the dev server.
+Then run `npm run dev` and confirm http://localhost:3000 shows the bio and two featured cards side by side, and http://localhost:3000/projects shows three cards with "Projects" marked active in the nav. Stop the dev server.
 
 - [ ] **Step 8: Commit**
 
@@ -1079,31 +1081,29 @@ import type { Experience, SkillGroup } from "@/lib/types";
 
 export function ExperienceEntry({ entry }: { entry: Experience }) {
   return (
-    <article className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-        <h3 className="text-lg font-semibold">{entry.role}</h3>
-        <span className="text-sm text-neutral-600 dark:text-neutral-400">
-          {formatDateRange(entry.start, entry.end)}
-        </span>
-      </div>
-      <p className="text-neutral-700 dark:text-neutral-300">
-        <span>{entry.company}</span>
-        <span aria-hidden="true"> · </span>
-        <span>{entry.location}</span>
-      </p>
-      <ul className="list-disc space-y-1 pl-5">
+    <article>
+      <header>
+        <hgroup>
+          <h3>{entry.role}</h3>
+          <p>
+            <span>{entry.company}</span>
+            <span aria-hidden="true"> · </span>
+            <span>{entry.location}</span>
+          </p>
+        </hgroup>
+        <small>{formatDateRange(entry.start, entry.end)}</small>
+      </header>
+      <ul>
         {entry.highlights.map((h) => (
           <li key={h}>{h}</li>
         ))}
       </ul>
       {entry.tech && entry.tech.length > 0 ? (
-        <ul className="flex flex-wrap gap-2 text-xs">
+        <p>
           {entry.tech.map((tag) => (
-            <li key={tag} className="rounded bg-neutral-100 px-2 py-1 dark:bg-neutral-800">
-              {tag}
-            </li>
+            <code key={tag}>{tag}</code>
           ))}
-        </ul>
+        </p>
       ) : null}
     </article>
   );
@@ -1111,10 +1111,10 @@ export function ExperienceEntry({ entry }: { entry: Experience }) {
 
 export function SkillGroups({ groups }: { groups: SkillGroup[] }) {
   return (
-    <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-[auto_1fr]">
+    <dl>
       {groups.map((group) => (
-        <div key={group.label} className="contents">
-          <dt className="font-semibold">{group.label}</dt>
+        <div key={group.label}>
+          <dt>{group.label}</dt>
           <dd>{group.skills.join(", ")}</dd>
         </div>
       ))}
@@ -1148,28 +1148,26 @@ export default function ResumePage() {
   const entries = sortByStartDesc(experience);
 
   return (
-    <div className="space-y-10">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">Resume</h1>
-        {site.resumePdf ? (
-          <a href={site.resumePdf} className="text-sm underline underline-offset-4">
-            Download PDF
-          </a>
-        ) : null}
-      </div>
+    <>
+      <h1>Resume</h1>
+      {site.resumePdf ? (
+        <p>
+          <a href={site.resumePdf}>Download PDF</a>
+        </p>
+      ) : null}
 
-      <section className="space-y-8">
-        <h2 className="text-xl font-semibold">Experience</h2>
+      <section>
+        <h2>Experience</h2>
         {entries.map((entry) => (
           <ExperienceEntry key={`${entry.company}-${entry.start}`} entry={entry} />
         ))}
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-xl font-semibold">Skills</h2>
+      <section>
+        <h2>Skills</h2>
         <SkillGroups groups={skillGroups} />
       </section>
-    </div>
+    </>
   );
 }
 ```
@@ -1195,7 +1193,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-### Task 6: Cloudflare configuration and deployment instructions
+### Task 6: Cloudflare configuration, README, and push to GitHub
 
 **Files:**
 - Create: `wrangler.jsonc`
@@ -1203,7 +1201,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `out/` from `npm run build`
-- Produces: a repo Cloudflare can build and deploy from Git with no dashboard-only configuration beyond connecting the repo
+- Produces: a repo on GitHub that Cloudflare can build and deploy from Git with no dashboard-only configuration beyond connecting the repo
 
 - [ ] **Step 1: Add Wrangler and the static-assets config**
 
@@ -1227,7 +1225,7 @@ Create `wrangler.jsonc`:
 
 `not_found_handling: "404-page"` serves `out/404.html` for unknown paths, which is what `next build` writes from `not-found.tsx`. Default HTML handling maps `/resume` to `out/resume.html`.
 
-- [ ] **Step 2: Add a deploy script**
+- [ ] **Step 2: Add a deploy script for deploying from a laptop**
 
 In `package.json`, add to `scripts`:
 
@@ -1235,7 +1233,7 @@ In `package.json`, add to `scripts`:
 "deploy": "npm run check && npm run build && wrangler deploy"
 ```
 
-This is for deploying from a laptop after `npx wrangler login`. Cloudflare's Git integration runs the check, build, and `wrangler deploy` as separate configured commands (see the README in Step 4).
+Cloudflare's Git integration runs the check, build, and `wrangler deploy` as separately configured commands (see the README in Step 4); this script is for a manual deploy after `npx wrangler login`.
 
 - [ ] **Step 3: Verify Wrangler accepts the config with a dry run**
 
@@ -1252,7 +1250,7 @@ Replace `README.md` entirely:
 ```markdown
 # Personal site
 
-Static site built with Next.js (static export), Tailwind CSS, and deployed to Cloudflare.
+Static site built with Next.js (static export), styled by Pico CSS, deployed to Cloudflare.
 
 ## Editing content
 
@@ -1263,6 +1261,10 @@ All content lives in `src/data/`:
 - `projects.ts`: projects; set `featured: true` to show one on the home page.
 
 Types in `src/lib/types.ts` catch shape mistakes at `npm run typecheck`.
+
+## Styling
+
+There is none of our own. Components are bare semantic HTML and the classless build of [Pico CSS](https://picocss.com) provides the look, including dark mode from the OS setting. To restyle the site later, remove the Pico import in `src/app/layout.tsx` and add whatever comes next. The markup stays.
 
 ## Local development
 
@@ -1275,10 +1277,9 @@ Types in `src/lib/types.ts` catch shape mistakes at `npm run typecheck`.
 
 The site deploys from GitHub on every push to `main`. One-time setup:
 
-1. Push this repo to GitHub.
-2. In the Cloudflare dashboard, go to Workers & Pages, click Create, choose the Workers tab, and pick Import a repository. Select this repo.
-3. Set the build command to `npm run check && npm run build` and the deploy command to `npx wrangler deploy` (the default). Production branch: `main`.
-4. After the first deploy, open the Worker's Settings, Domains & Routes, and add your custom domain. If the domain's DNS is on Cloudflare this is one click; otherwise add the CNAME it shows you at your registrar.
+1. In the Cloudflare dashboard, go to Workers & Pages, click Create, choose the Workers tab, and pick Import a repository. Select `george-haws/personal-site`.
+2. Set the build command to `npm run check && npm run build` and the deploy command to `npx wrangler deploy` (the default). Production branch: `main`.
+3. After the first deploy, open the Worker's Settings, Domains & Routes, and add your custom domain. If the domain's DNS is on Cloudflare this is one click; otherwise add the CNAME it shows you at your registrar.
 
 Every other branch gets a preview URL. A failed check or build leaves the last good deploy live.
 
@@ -1304,13 +1305,17 @@ git commit -m "Add Cloudflare deploy config and README
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 7: Owner steps (not automatable from this plan)**
+- [ ] **Step 7: Push to GitHub**
 
-These need the owner's GitHub and Cloudflare accounts:
+The repo https://github.com/george-haws/personal-site already exists and is empty. The local branch is already `main`.
 
 ```bash
-git branch -M main
-gh repo create personal-site --private --source=. --push
+git remote add origin https://github.com/george-haws/personal-site.git
+git push -u origin main
 ```
 
-Then follow the README's Deployment section in the Cloudflare dashboard, and replace the placeholder content in `src/data/` with real content.
+Expected: the push succeeds and `gh repo view george-haws/personal-site --json defaultBranchRef` shows `main`.
+
+- [ ] **Step 8: Owner steps (need the owner's Cloudflare account)**
+
+Follow the README's Deployment section in the Cloudflare dashboard, then replace the placeholder content in `src/data/` with real content.
