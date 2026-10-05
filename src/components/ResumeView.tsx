@@ -7,9 +7,12 @@ export function ResumeView({ title, resume, pdfHref }: { title: string; resume: 
 
   return (
     <>
-      <h1 className="text-2xl font-semibold text-foreground before:mr-2 before:text-primary before:content-['$']">
-        {title}
-      </h1>
+      <hgroup>
+        <h1 className="text-2xl font-semibold text-foreground before:mr-2 before:text-primary before:content-['$']">
+          {title}
+        </h1>
+        <p className="mt-1 text-muted-foreground">{resume.headline}</p>
+      </hgroup>
       {pdfHref ? (
         <p className="mt-3">
           <a href={pdfHref} className="text-sm text-primary hover:underline">
