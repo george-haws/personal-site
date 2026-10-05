@@ -115,13 +115,15 @@ Run with `tsx`, which honors the `@/` path alias.
 1. Render Markdown for `icResume` and write `docs/resume-ic.md`.
 2. Render HTML. If it equals the committed `docs/resume-ic.html` and
    `public/resume.pdf` exists, print "PDF up to date" and stop, unless
-   `--force` was passed. Otherwise write `docs/resume-ic.html` and continue.
+   `--force` was passed. Otherwise continue.
 3. Launch Chrome via `playwright-core` (`chromium.launch({ channel: "chrome"
    })`). Inside `try`/`finally` so the browser always closes:
    `page.setContent(html, { waitUntil: "load" })`, then `page.pdf({
    preferCSSPageSize: true, printBackground: true })`, and write
    `public/resume.pdf`. No `format` or `margin` options are passed; the CSS
-   `@page` rule is the single source of page geometry.
+   `@page` rule is the single source of page geometry. Only after the PDF is
+   written, write `docs/resume-ic.html`, so a failed print can never leave
+   HTML on disk that claims an old PDF is current.
 4. On any failure (Chrome missing, render error), print a one-line message
    naming the cause and exit non-zero. The Markdown is written first so a PDF
    failure never leaves it stale.
