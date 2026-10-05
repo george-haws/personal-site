@@ -11,6 +11,10 @@ export type SiteInfo = {
   name: string;
   tagline: string;
   bio: string;
+  /** City and region, e.g. "Long Beach, CA". Shown in the resume exports' contact line. */
+  location: string;
+  /** Canonical site URL with protocol, e.g. "https://ghaws.dev". */
+  url: string;
   links: SocialLinks;
   /** Path under public/, e.g. "/resume.pdf". Omit to hide the download link. */
   resumePdf?: string;
@@ -34,6 +38,8 @@ export type SkillGroup = {
 
 /** One variant of the resume: the same history, arranged for a particular audience. */
 export type Resume = {
+  /** Title shown under the name on the resume page and in the exports, e.g. "Staff Software Engineer". */
+  headline: string;
   /** A few sentences positioning the candidate for this variant's audience. */
   summary: string;
   experience: Experience[];

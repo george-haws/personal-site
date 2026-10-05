@@ -105,6 +105,7 @@ const chute = {
 
 /** Arranged for Staff-level individual contributor roles. */
 export const icResume: Resume = {
+  headline: "Staff Software Engineer",
   summary:
     "Staff engineer with thirteen years on complex B2B products, from industrial data platforms to FDA-registered clinical software to a database-as-a-service console. I own the product surface end to end: client architecture, UX, and the services and pipelines under it. At Aerospike I lead the front-end team, cut end-to-end CI from an hour to 8 minutes, moved releases from every few weeks to several a week, and built the agentic development workflow now used by engineers and non-engineers across the org.",
   experience: [
