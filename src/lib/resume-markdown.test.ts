@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { icResume } from "@/data/resume";
+import { site as realSite } from "@/data/site";
 import { describe, it, expect } from "vitest";
 import { renderResumeMarkdown } from "@/lib/resume-markdown";
 import type { Resume, SiteInfo } from "@/lib/types";
@@ -81,5 +85,14 @@ describe("renderResumeMarkdown", () => {
 
   it("leaves out tech tags", () => {
     expect(md).not.toContain("Rust");
+  });
+});
+
+describe("docs/resume-ic.md", () => {
+  it("matches the current resume data", () => {
+    const committed = readFileSync(path.join(process.cwd(), "docs/resume-ic.md"), "utf8");
+    expect(renderResumeMarkdown(icResume, realSite), "docs/resume-ic.md is stale; run `npm run resume`").toBe(
+      committed,
+    );
   });
 });

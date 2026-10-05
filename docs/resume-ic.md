@@ -2,7 +2,7 @@
 
 **Staff Software Engineer**
 
-Long Beach, CA · me@ghaws.dev · [ghaws.dev](https://ghaws.dev) · [github.com/george-haws](https://github.com/george-haws) · [linkedin.com/in/gehaws](https://www.linkedin.com/in/gehaws/)
+Long Beach, CA · [me@ghaws.dev](mailto:me@ghaws.dev) · [ghaws.dev](https://ghaws.dev) · [github.com/george-haws](https://github.com/george-haws) · [linkedin.com/in/gehaws](https://www.linkedin.com/in/gehaws)
 
 ## Summary
 
@@ -15,7 +15,7 @@ Staff engineer with thirteen years on complex B2B products, from industrial data
 - **Backend and data:** Node.js, Express, Spring, GraphQL, REST API design, MariaDB
 - **Testing and delivery:** Playwright, Jest, CI/CD design, webpack
 - **Cloud:** AWS, GCP, Azure
-- **AI tooling:** Claude Code, Cursor, agent skill development
+- **AI tooling:** Claude Code, Cursor, Agent skill development
 
 ## Experience
 

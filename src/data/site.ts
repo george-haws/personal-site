@@ -11,4 +11,5 @@ export const site: SiteInfo = {
     linkedin: "https://www.linkedin.com/in/gehaws",
     email: "me@ghaws.dev",
   },
+  resumePdf: "/resume.pdf",
 };

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>George Haws — Staff Software Engineer</title>
+<style>
+@page { size: Letter; margin: 0.6in; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height: 1.35; color: #000; background: #fff; }
+a { color: inherit; text-decoration: none; }
+p { margin: 0; }
+h1 { margin: 0; font-size: 20pt; }
+.headline { margin-top: 2pt; font-size: 12pt; }
+.contact { margin-top: 4pt; font-size: 9.5pt; }
+h2 { margin: 14pt 0 6pt; padding-bottom: 2pt; border-bottom: 0.75pt solid #000; font-size: 11pt; text-transform: uppercase; letter-spacing: 0.04em; break-after: avoid; }
+ul { margin: 3pt 0 0; padding-left: 14pt; }
+li { margin-bottom: 2pt; }
+.skills { list-style: none; padding-left: 0; }
+.entry { margin-bottom: 9pt; }
+.entry-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12pt; break-after: avoid; }
+h3 { margin: 0; font-size: 10.5pt; }
+.company { font-weight: normal; }
+.dates { white-space: nowrap; }
+.location { font-style: italic; break-after: avoid; }
+</style>
+</head>
+<body>
+<header>
+<h1>George Haws</h1>
+<p class="headline">Staff Software Engineer</p>
+<p class="contact">Long Beach, CA · <a href="mailto:me@ghaws.dev">me@ghaws.dev</a> · <a href="https://ghaws.dev">ghaws.dev</a> · <a href="https://github.com/george-haws">github.com/george-haws</a> · <a href="https://www.linkedin.com/in/gehaws">linkedin.com/in/gehaws</a></p>
+</header>
+<section>
+<h2>Summary</h2>
+<p>Staff engineer with thirteen years on complex B2B products, from industrial data platforms to FDA-registered clinical software to a database-as-a-service console. I own the product surface end to end: client architecture, UX, and the services and pipelines under it. At Aerospike I lead the front-end team, cut end-to-end CI from an hour to 8 minutes, moved releases from every few weeks to several a week, and built the agentic development workflow now used by engineers and non-engineers across the org.</p>
+</section>
+<section>
+<h2>Skills</h2>
+<ul class="skills">
+<li><strong>Languages:</strong> TypeScript, JavaScript, Java, Go, Scala</li>
+<li><strong>Frontend:</strong> React, Next.js, HTML, CSS, D3</li>
+<li><strong>Backend and data:</strong> Node.js, Express, Spring, GraphQL, REST API design, MariaDB</li>
+<li><strong>Testing and delivery:</strong> Playwright, Jest, CI/CD design, webpack</li>
+<li><strong>Cloud:</strong> AWS, GCP, Azure</li>
+<li><strong>AI tooling:</strong> Claude Code, Cursor, Agent skill development</li>
+</ul>
+</section>
+<section>
+<h2>Experience</h2>
+<div class="entry">
+<div class="entry-head">
+<h3>Staff Software Engineer<span class="company">, Aerospike</span></h3>
+<span class="dates">Mar 2026 – Present</span>
+</div>
+<p class="location">Remote</p>
+<ul>
+<li>Tech lead and acting manager for the four-engineer front-end team; set technical direction for Aerospike Cloud, the DBaaS console, and the desktop database browser.</li>
+<li>Took releases from every few weeks to several times a week by re-architecting the Playwright end-to-end suite that 7 engineers across 2 teams depend on: most tests moved to mocked infrastructure, with live databases kept for critical workflows only.</li>
+<li>Cut end-to-end CI time from 60 minutes to 8 and flake rate from over 40% to under 5%, and reduced provisioned test databases by 80%.</li>
+<li>Built the user flows and backend-for-frontend layer for GCP support in Aerospike Cloud (Next.js), which let one of the company&#39;s largest customers migrate 80 self-managed database clusters to the hosted service.</li>
+<li>Wrote the RFC for feature-enablement governance and traceability in production, where none existed. Accepted by SRE management, it is now policy across the engineering org.</li>
+<li>Narrowed the shared feature library to cross-product features only, cutting release volume and test overhead; four core features now ship to Aerospike Cloud and the desktop app from one codebase. Built the CI/CD pipelines for the library and the design system component library.</li>
+<li>Built the engineering org&#39;s AI development workflow: curated agent skills backed by fast deterministic feedback loops (lint, type, and test gates in CI) and agent-driven design-standards review. Adopted by engineers and non-engineers across the organization.</li>
+</ul>
+</div>
+<div class="entry">
+<div class="entry-head">
+<h3>Senior Software Engineer<span class="company">, BITSCOPIC</span></h3>
+<span class="dates">Aug 2024 – Mar 2026</span>
+</div>
+<p class="location">Remote</p>
+<ul>
+<li>Sole front-end engineer for two products used across about a dozen hospital systems, owning design, implementation, and delivery end to end: PraediAlert, FDA-registered clinical surveillance software for infection preventionists and pharmacists, and Praedico, a nationwide public health surveillance and outbreak management platform. Built new endpoints in the Java Spring backend and maintained the service.</li>
+<li>Redesigned and rebuilt PraediAlert as a React application in about three months while it stayed in clinical use: visual design, reworked critical workflows, and the full implementation, replacing the legacy Ember codebase.</li>
+</ul>
+</div>
+<div class="entry">
+<div class="entry-head">
+<h3>Software Engineer<span class="company">, Independent Contractor</span></h3>
+<span class="dates">Oct 2023 – Feb 2024</span>
+</div>
+<p class="location">Remote</p>
+<ul>
+<li>Built the front end of an AI-assisted clinical trial design tool for an early-stage client.</li>
+</ul>
+</div>
+<div class="entry">
+<div class="entry-head">
+<h3>Staff Software Engineer<span class="company">, Element Analytics</span></h3>
+<span class="dates">Sep 2020 – Sep 2023</span>
+</div>
+<p class="location">Remote</p>
+<ul>
+<li>Made the case for a dedicated front-end team, recruited all four engineers, and managed it: the team took full ownership of the flagship React application and the cloud-native connectors to OSIsoft PI, SAP, Honeywell, IBM Maximo, Amazon S3, and Power BI, replacing a model where backend engineers filled in on front-end work.</li>
+<li>Grew end-to-end coverage from a handful of tests to a full suite; releases went from monthly to several times a week.</li>
+<li>Promoted two engineers from junior to mid-level.</li>
+</ul>
+</div>
+<div class="entry">
+<div class="entry-head">
+<h3>Senior Software Engineer<span class="company">, Element Analytics</span></h3>
+<span class="dates">Jul 2016 – Sep 2020</span>
+</div>
+<p class="location">San Francisco Bay Area</p>
+<ul>
+<li>Designed and built a drag-and-drop visual programming language for transforming industrial historian data.</li>
+<li>Re-architected the canvas&#39;s React rendering, layout engine, and state management, raising its practical ceiling from hundreds of nodes to thousands.</li>
+<li>Built the unit testing framework, browser integration test suite, and continuous delivery pipeline for the primary React application.</li>
+<li>Served as product owner and scrum master for the React app: set the roadmap and met with users to shape requirements.</li>
+<li>Mentored junior engineers on React architecture and front-end engineering practice; contributed to the Scala and MariaDB backend.</li>
+</ul>
+</div>
+<div class="entry">
+<div class="entry-head">
+<h3>Software Engineer<span class="company">, Apcera</span></h3>
+<span class="dates">Feb 2015 – Jul 2016</span>
+</div>
+<p class="location">San Francisco Bay Area</p>
+<ul>
+<li>Built the dashboard for Apcera&#39;s container platform with a small team of engineers and designers, using Mithril.js and React.</li>
+</ul>
+</div>
+<div class="entry">
+<div class="entry-head">
+<h3>Engineer<span class="company">, Bleacher Report</span></h3>
+<span class="dates">Oct 2014 – Jan 2015</span>
+</div>
+<p class="location">San Francisco Bay Area</p>
+<ul>
+<li>Implemented a full redesign of the home page, seen by more than 80 million unique visitors a month.</li>
+</ul>
+</div>
+<div class="entry">
+<div class="entry-head">
+<h3>Product/Platform Engineer and Development Team Lead<span class="company">, Chute</span></h3>
+<span class="dates">Aug 2013 – Sep 2014</span>
+</div>
+<p class="location">San Francisco Bay Area</p>
+<ul>
+<li>Owned the technical backlog for Chute&#39;s core front-end product, a Marionette.js application, and shipped a JSON API, performant D3 charts, and a queued processor for aggregating analytics data on aggressive deadlines.</li>
+<li>Led a team of two to four engineers on professional services projects: set coding standards, built automation tooling, and scoped projects with clients on pre- and post-sales calls.</li>
+</ul>
+</div>
+</section>
+</body>
+</html>

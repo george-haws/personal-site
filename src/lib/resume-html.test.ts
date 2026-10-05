@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { icResume } from "@/data/resume";
+import { site as realSite } from "@/data/site";
 import { describe, it, expect } from "vitest";
 import { escapeHtml, renderResumeHtml } from "@/lib/resume-html";
 import type { Resume, SiteInfo } from "@/lib/types";
@@ -120,6 +124,15 @@ describe("renderResumeHtml", () => {
     expect(parsed.querySelector("[onclick]")).toBeNull();
     expect(parsed.querySelector('a[href^="https://github.com"]')!.getAttribute("href")).toBe(
       `https://github.com/a" onclick="x`,
+    );
+  });
+});
+
+describe("docs/resume-ic.html", () => {
+  it("matches the current resume data and template", () => {
+    const committed = readFileSync(path.join(process.cwd(), "docs/resume-ic.html"), "utf8");
+    expect(renderResumeHtml(icResume, realSite), "docs/resume-ic.html is stale; run `npm run resume`").toBe(
+      committed,
     );
   });
 });
