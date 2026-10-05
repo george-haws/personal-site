@@ -28,7 +28,7 @@ h1 { margin: 0; font-size: 20pt; }
 .contact { margin-top: 4pt; font-size: 9.5pt; }
 h2 { margin: 14pt 0 6pt; padding-bottom: 2pt; border-bottom: 0.75pt solid #000; font-size: 11pt; text-transform: uppercase; letter-spacing: 0.04em; break-after: avoid; }
 ul { margin: 3pt 0 0; padding-left: 14pt; }
-li { margin-bottom: 2pt; }
+li { margin-bottom: 2pt; break-inside: avoid; }
 .skills { list-style: none; padding-left: 0; }
 .entry { margin-bottom: 9pt; }
 .entry-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12pt; break-after: avoid; }

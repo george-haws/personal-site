@@ -6,11 +6,17 @@ Static site built with Next.js (static export), styled by Pico CSS, deployed to 
 
 All content lives in `src/data/`:
 
-- `site.ts`: name, tagline, bio, social links, optional `resumePdf` (drop the PDF in `public/` and set the path, e.g. `/resume.pdf`).
-- `resume.ts`: `experience` entries (dates are `YYYY-MM`; omit `end` for a current role) and `skillGroups`.
+- `site.ts`: name, tagline, bio, location, site URL, social links, and `resumePdf` (the path of the generated PDF, `/resume.pdf`).
+- `resume.ts`: `headline`, `summary`, `experience` entries (dates are `YYYY-MM`; omit `end` for a current role) and `skillGroups`.
 - `projects.ts`: projects; set `featured: true` to show one on the home page.
 
 Types in `src/lib/types.ts` catch shape mistakes at `npm run typecheck`.
+
+## Resume exports
+
+`docs/resume-ic.md` and `public/resume.pdf` are generated from `src/data/resume.ts` and `src/data/site.ts`. After editing either file, run `npm run resume` and commit `docs/resume-ic.md`, `docs/resume-ic.html`, and `public/resume.pdf`. `npm run check` fails until you do.
+
+The PDF is printed by your installed Google Chrome; nothing is downloaded. `docs/resume-ic.html` is the page it was printed from. If that page hasn't changed, the script skips printing; pass `npm run resume -- --force` to reprint anyway.
 
 ## Styling
 
@@ -22,6 +28,7 @@ There is none of our own. Components are bare semantic HTML and the classless bu
     npm run dev        # http://localhost:3000
     npm run check      # typecheck + lint + tests
     npm run build      # static export to out/
+    npm run resume     # regenerate the resume Markdown and PDF
 
 ## Deployment (Cloudflare, free tier)
 
