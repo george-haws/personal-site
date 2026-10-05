@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/", label: "About" },
   { href: "/resume", label: "Resume" },
-  { href: "/projects", label: "Projects" },
 ] as const;
 
 function isActive(href: string, currentPath: string): boolean {
