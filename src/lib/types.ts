@@ -32,6 +32,14 @@ export type SkillGroup = {
   skills: string[];
 };
 
+/** One variant of the resume: the same history, arranged for a particular audience. */
+export type Resume = {
+  /** A few sentences positioning the candidate for this variant's audience. */
+  summary: string;
+  experience: Experience[];
+  skillGroups: SkillGroup[];
+};
+
 export type Project = {
   title: string;
   /** One line, shown on cards. */

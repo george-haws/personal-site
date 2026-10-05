@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "About" },
@@ -13,14 +14,24 @@ function isActive(href: string, currentPath: string): boolean {
 
 export function NavLinks({ currentPath }: { currentPath: string }) {
   return (
-    <ul>
-      {navItems.map((item) => (
-        <li key={item.href}>
-          <Link href={item.href} aria-current={isActive(item.href, currentPath) ? "page" : undefined}>
-            {item.label}
-          </Link>
-        </li>
-      ))}
+    <ul className="flex items-center gap-5">
+      {navItems.map((item) => {
+        const active = isActive(item.href, currentPath);
+        return (
+          <li key={item.href}>
+            <Link
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "transition-colors hover:text-primary",
+                active ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              {item.label}
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

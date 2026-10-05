@@ -9,12 +9,13 @@ export function SocialLinks({ links }: { links: SocialLinksType }) {
   if (items.length === 0) return null;
 
   return (
-    <ul>
+    <ul className="flex items-center gap-4">
       {items.map((item) => (
         <li key={item.label}>
           <a
             href={item.href}
             {...(item.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            className="text-muted-foreground transition-colors hover:text-primary"
           >
             {item.label}
           </a>
