@@ -54,13 +54,13 @@ Follow the bundled guide at `node_modules/next/dist/docs/01-app/02-guides/mdx.md
 
 - Install `@next/mdx`, `@mdx-js/loader`, `@mdx-js/react`, `@types/mdx`, and `remark-gfm`.
 - In `next.config.ts`, wrap the config with `createMDX`, add `mdx` to `pageExtensions`, and pass `remark-gfm` as a string in `remarkPlugins` so it works under Turbopack. Keep `output: "export"` and the unoptimized images setting.
-- Add `mdx-components.tsx` at the project root (or under `src/` if the guide's convention check requires it; verify which location Next 16 resolves). It exports `useMDXComponents` returning the element map below.
+- Add `src/mdx-components.tsx`. Next resolves the file at the project root or inside `src/` when `src/` is used, which this project does. It must export a single function named `useMDXComponents`, taking no arguments, that returns the element map below.
 
 ## Routes and components
 
 - `src/app/writing/page.tsx`: index. Heading "Writing" in the page H1 style. Lists `posts` sorted by `published` descending, each rendered with `PostListItem`. Metadata title "Writing".
 - `src/app/writing/[slug]/page.tsx`: dynamic route. `generateStaticParams` returns one entry per registry slug. `dynamicParams = false` so unknown slugs 404. `generateMetadata` returns the post's title and description. The page looks up the post by slug, imports `@/content/writing/${slug}.mdx`, and renders `PostHeader` followed by the MDX body.
-- `src/components/PostHeader.tsx`: title as H1 in the page style, published date beneath it formatted with the existing helpers in `src/lib/dates.ts` (add a formatter there if none fits a full date).
+- `src/components/PostHeader.tsx`: title as H1 in the page style, published date beneath it. `src/lib/dates.ts` only formats year-month values, so add `formatDate(iso: string)` there, using `Intl.DateTimeFormat` in UTC like `formatMonth`, producing e.g. "Oct 9, 2026", with a test alongside the existing ones.
 - `src/components/PostListItem.tsx`: title linking to the post, date, description.
 - `src/components/NavLinks.tsx`: add `{ href: "/writing", label: "Writing" }` between About and Resume.
 
