@@ -42,7 +42,7 @@ export type Post = {
 Add `src/data/posts.ts` exporting `posts: Post[]` with the first entry:
 
 - slug: `fast-validation-for-ai-driven-development`
-- title: `The bottleneck moved. Validation has to move with it.`
+- title: `Elevate the constraint: validation in the AI era`
 - description: one or two sentences stating the thesis, written at implementation time from the post's opening.
 - published: the date it ships, set at implementation time.
 
