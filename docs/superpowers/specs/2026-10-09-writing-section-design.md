@@ -88,7 +88,7 @@ Other elements fall through to defaults until a post needs them.
 
 - Unknown slug: 404 via `dynamicParams = false`.
 - Registry entry with no MDX file: the data test fails, and the build fails on the import.
-- MDX file with no registry entry: not routed, not listed, no error. Acceptable; it is a draft.
+- MDX file with no registry entry: not routed and not listed, but still compiled, because the dynamic import in the post route makes the bundler include every file under src/content/writing/. A draft with an MDX syntax error there breaks the build, so keep unpublished drafts in docs/drafts/ until they are ready.
 
 ## Done when
 

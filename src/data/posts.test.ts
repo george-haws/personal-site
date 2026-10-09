@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 import { posts } from "@/data/posts";
@@ -34,6 +34,14 @@ describe("posts", () => {
     for (const post of posts) {
       const file = join(process.cwd(), "src", "content", "writing", `${post.slug}.mdx`);
       expect(existsSync(file), file).toBe(true);
+    }
+  });
+
+  it("keeps the H1 out of every MDX body, since the page renders the title", () => {
+    for (const post of posts) {
+      const file = join(process.cwd(), "src", "content", "writing", `${post.slug}.mdx`);
+      const body = readFileSync(file, "utf8");
+      expect(body, post.slug).not.toMatch(/^# /m);
     }
   });
 });
