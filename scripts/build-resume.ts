@@ -26,7 +26,10 @@ async function main() {
     return;
   }
 
-  const browser = await chromium.launch({ channel: "chrome" });
+  // Chrome writes its user agent into the PDF's Creator field, which would
+  // otherwise expose the headless Chrome build and macOS version. A context-level
+  // userAgent override does not reach the print code; only the launch flag does.
+  const browser = await chromium.launch({ channel: "chrome", args: [`--user-agent=${site.name}`] });
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "load" });
