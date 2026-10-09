@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { ProjectCard } from "@/components/ProjectCard";
 import { SocialLinks } from "@/components/SocialLinks";
+import { projects } from "@/data/projects";
 import { site } from "@/data/site";
 
 export default function Home() {
+  const featured = projects.filter((p) => p.featured);
+
   return (
     <>
       <section className="flex flex-col gap-4">
@@ -31,6 +35,19 @@ export default function Home() {
           ) : null}
         </p>
       </section>
+
+      {featured.length > 0 ? (
+        <section className="mt-12 flex flex-col gap-4">
+          <h2 className="text-lg font-medium text-foreground before:mr-2 before:text-primary before:content-['#']">
+            Featured projects
+          </h2>
+          <div className="grid gap-4">
+            {featured.map((project) => (
+              <ProjectCard key={project.title} project={project} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }

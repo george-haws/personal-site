@@ -9,9 +9,15 @@ describe("Home", () => {
     expect(screen.getByRole("link", { name: "PDF" })).toHaveAttribute("href", "/resume.pdf");
   });
 
-  it("does not show projects", () => {
+  it("shows the featured projects with their sample output", () => {
     render(<Home />);
-    expect(screen.queryByRole("heading", { name: "Featured projects" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Featured projects" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Claude Code status line" })).toBeInTheDocument();
+    expect(screen.getByRole("figure")).toHaveTextContent("Started:");
+  });
+
+  it("does not link to the projects page", () => {
+    render(<Home />);
     expect(screen.queryByRole("link", { name: /projects/i })).toBeNull();
   });
 });

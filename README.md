@@ -8,7 +8,7 @@ All content lives in `src/data/`:
 
 - `site.ts`: name, tagline, bio, location, site URL, social links, and `resumePdf` (the path of the generated PDF, `/resume.pdf`).
 - `resume.ts`: `headline`, `summary`, `experience` entries (dates are `YYYY-MM`; omit `end` for a current role) and `skillGroups`.
-- `projects.ts`: projects; set `featured: true` to show one on the home page.
+- `projects.ts`: projects; set `featured: true` to show one on the home page. `demo` is optional sample terminal output, a list of lines made of styled spans, shown on the card in place of an image.
 
 Types in `src/lib/types.ts` catch shape mistakes at `npm run typecheck`.
 

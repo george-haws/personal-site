@@ -46,6 +46,15 @@ export type Resume = {
   skillGroups: SkillGroup[];
 };
 
+/** One styled run of text in a terminal sample. No style means plain text. */
+export type DemoSpan = {
+  text: string;
+  style?: "name" | "dim" | "label" | "italic";
+};
+
+/** One row of a terminal sample. */
+export type DemoLine = DemoSpan[];
+
 export type Project = {
   title: string;
   /** One line, shown on cards. */
@@ -57,5 +66,7 @@ export type Project = {
   liveUrl?: string;
   /** Path under public/. */
   image?: string;
+  /** Sample terminal output, shown where the image would go. */
+  demo?: DemoLine[];
   featured: boolean;
 };

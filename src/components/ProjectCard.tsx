@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import type { Project } from "@/lib/types";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { TerminalDemo } from "@/components/TerminalDemo";
 
 export function ProjectCard({ project }: { project: Project }) {
   const hasLinks = Boolean(project.repoUrl || project.liveUrl);
@@ -15,6 +16,7 @@ export function ProjectCard({ project }: { project: Project }) {
         // eslint-disable-next-line @next/next/no-img-element -- static export, no image optimization
         <img src={project.image} alt={project.title} className="w-full" />
       ) : null}
+      {project.demo ? <TerminalDemo lines={project.demo} /> : null}
       <CardContent className="flex flex-col gap-3">
         <p className="text-sm">{project.description}</p>
         <p className="flex flex-wrap gap-x-2 gap-y-1">

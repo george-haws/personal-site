@@ -47,4 +47,15 @@ describe("ProjectCard", () => {
     rerender(<ProjectCard project={{ ...base, image: "/tool.png" }} />);
     expect(screen.getByRole("img", { name: "Tool" })).toHaveAttribute("src", "/tool.png");
   });
+
+  it("renders a terminal demo only when one is given", () => {
+    const { rerender } = render(<ProjectCard project={base} />);
+    expect(screen.queryByRole("figure")).toBeNull();
+    rerender(
+      <ProjectCard
+        project={{ ...base, demo: [[{ text: "Doing:", style: "label" }, { text: " Run tests (4s)" }]] }}
+      />,
+    );
+    expect(screen.getByRole("figure")).toHaveTextContent("Doing: Run tests (4s)");
+  });
 });
