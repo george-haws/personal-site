@@ -70,3 +70,13 @@ export type Project = {
   demo?: DemoLine[];
   featured: boolean;
 };
+
+export type Post = {
+  /** URL segment under /writing, also the MDX file name without extension. */
+  slug: string;
+  title: string;
+  /** One or two sentences, shown on the index and used as the page description. */
+  description: string;
+  /** ISO date, e.g. "2026-10-09". */
+  published: string;
+};

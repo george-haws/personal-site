@@ -42,7 +42,7 @@ export type Post = {
 Add `src/data/posts.ts` exporting `posts: Post[]` with the first entry:
 
 - slug: `fast-validation-for-ai-driven-development`
-- title: `The bottleneck moved. Validation has to move with it.`
+- title: `Elevate the constraint: validation in the AI era`
 - description: one or two sentences stating the thesis, written at implementation time from the post's opening.
 - published: the date it ships, set at implementation time.
 
@@ -88,7 +88,7 @@ Other elements fall through to defaults until a post needs them.
 
 - Unknown slug: 404 via `dynamicParams = false`.
 - Registry entry with no MDX file: the data test fails, and the build fails on the import.
-- MDX file with no registry entry: not routed, not listed, no error. Acceptable; it is a draft.
+- MDX file with no registry entry: not routed and not listed, but still compiled, because the dynamic import in the post route makes the bundler include every file under src/content/writing/. A draft with an MDX syntax error there breaks the build, so keep unpublished drafts in docs/drafts/ until they are ready.
 
 ## Done when
 

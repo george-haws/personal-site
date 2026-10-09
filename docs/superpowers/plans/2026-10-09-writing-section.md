@@ -199,7 +199,7 @@ import type { Post } from "@/lib/types";
 export const posts: Post[] = [
   {
     slug: "fast-validation-for-ai-driven-development",
-    title: "The bottleneck moved. Validation has to move with it.",
+    title: "Elevate the constraint: validation in the AI era",
     description:
       "AI made producing change cheap, so the constraint on delivery moved to validation. Projects need fast deterministic and judgment-based checks at every tier, or they get no acceleration or ship instability.",
     published: "2026-10-09",
@@ -607,7 +607,7 @@ describe("WritingPage", () => {
   it("links to the fast validation post", () => {
     render(<WritingPage />);
     expect(
-      screen.getByRole("link", { name: "The bottleneck moved. Validation has to move with it." }),
+      screen.getByRole("link", { name: "Elevate the constraint: validation in the AI era" }),
     ).toHaveAttribute("href", "/writing/fast-validation-for-ai-driven-development");
   });
 });
@@ -711,7 +711,7 @@ grep -c "<table" out/writing/fast-validation-for-ai-driven-development/index.htm
 grep -o "<title>[^<]*</title>" out/writing/fast-validation-for-ai-driven-development/index.html
 ```
 
-Expected: `index.html` exists in both directories; the table count is `1`; the title is `The bottleneck moved. Validation has to move with it. · George Haws`.
+Expected: `index.html` exists in both directories; the table count is `1`; the title is `Elevate the constraint: validation in the AI era · George Haws`.
 
 If the build fails on the dynamic import, confirm the import path ends in `.mdx` and `pageExtensions` includes `mdx` (Task 3).
 
