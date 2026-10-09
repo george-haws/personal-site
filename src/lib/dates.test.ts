@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatMonth, formatDateRange } from "@/lib/dates";
+import { formatMonth, formatDateRange, formatDate } from "@/lib/dates";
 
 describe("formatMonth", () => {
   it("formats YYYY-MM as short month and year", () => {
@@ -15,5 +15,12 @@ describe("formatDateRange", () => {
 
   it("formats both ends when end is given", () => {
     expect(formatDateRange("2018-06", "2021-02")).toBe("Jun 2018 – Feb 2021");
+  });
+});
+
+describe("formatDate", () => {
+  it("formats an ISO date as short month, day, and year", () => {
+    expect(formatDate("2026-10-09")).toBe("Oct 9, 2026");
+    expect(formatDate("2025-01-31")).toBe("Jan 31, 2025");
   });
 });
