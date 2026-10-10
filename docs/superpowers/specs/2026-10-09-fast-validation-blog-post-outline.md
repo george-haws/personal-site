@@ -1,6 +1,6 @@
 # Blog post outline: Fast validation for AI-driven development
 
-**Status:** outline approved in brainstorming, ready to draft
+**Status:** drafted and published, then split on 2026-10-09. The second principle, check the checker, the benchmark, and the engineer moves moved to a second post; see `2026-10-09-agents-build-the-gates-outline.md`, which also specifies the trim of this post.
 **Target length:** about 2050 words
 **Working title:** The bottleneck moved. Validation has to move with it.
 
