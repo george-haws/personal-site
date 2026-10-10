@@ -14,4 +14,12 @@ describe("WritingPage", () => {
       screen.getByRole("link", { name: "Elevate the constraint: validation in the AI era" }),
     ).toHaveAttribute("href", "/writing/fast-validation-for-ai-driven-development");
   });
+
+  it("links to the agents build the gates post", () => {
+    render(<WritingPage />);
+    expect(screen.getByRole("link", { name: "Let the agents build the gates" })).toHaveAttribute(
+      "href",
+      "/writing/agents-build-the-gates",
+    );
+  });
 });

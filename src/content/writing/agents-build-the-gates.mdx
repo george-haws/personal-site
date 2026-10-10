@@ -1,0 +1,61 @@
+## The gates are code
+
+The [previous post](/writing/fast-validation-for-ai-driven-development) argued that AI moved the delivery constraint from writing code to validating it, and that the only way through is to elevate the constraint: invest in validation until it stops being the bottleneck. A leader who hears that hears a quarter of engineering time spent on test infrastructure. The bill is smaller than it sounds.
+
+Gates are code. Tests, fixtures, mocks, eval harnesses, review instructions: an agent produces all of it fast. The main cost of elevating the constraint is checking the agent's work, a fraction of building the same gates by hand.
+
+A gate the agent wrote is itself unvalidated change. You read it, the same as any other code an agent produces, and this post assumes you do. Each story below also has a second check on top of that reading. That is where the judgment goes. Skip it and you get a green suite that means nothing.
+
+Four things I had agents build, in the order you would build them: missing tests, a fast suite, an eval set, a review skill. Each with the ask, the failure, and the check.
+
+## The missing tests
+
+The codebase had thin coverage. I set a coverage target, split the codebase by section, and gave each section to a subagent.
+
+The agents hit the number by asserting content and static attributes instead of logic and behavior. A test that checks a button says "Submit" counts toward coverage and catches nothing.
+
+The pattern showed up in every section, so I wrote prompts that named it and had the agents fix their own tests. The pattern went away and the coverage number held. The fixes were prompts, not edits. Coverage is a deterministic number, and an agent will satisfy it by the cheapest route. The prompts are where the intent went.
+
+## The slow suite
+
+The product was a database-as-a-service platform. The suite took over an hour and was expensive, because tests created real databases on persistent clusters that had to stay up at all times. I asked the agent to make it fast: parallelize, and mock the integration boundaries.
+
+It did, and it reinvented the wheel, writing a factory system by hand instead of reaching for Fishery, a TypeScript test-factory library. The hand-rolled version worked, and the team would have owned it forever. I had the agent swap Fishery in.
+
+I planted failures in the code by hand, a manual form of mutation testing, and confirmed the fast suite caught them. The persistent clusters went away, and the suite ran in under ten minutes. A small smoke suite kept exercising the critical workflows against the live backend.
+
+The agent did what I asked, did it well, and still nearly left a maintenance burden. Watch for hand-rolled infrastructure and ask for the battle-tested tool by name. Plant the failures too, because the common way a fast suite goes wrong is mocking away the thing the test existed to catch.
+
+## The eval set
+
+An eval set is a fixed set of cases with written assertions, used to score a non-deterministic check. I gathered cases from past PRs with known problems, plus the existing misses: changes the review process had let through. I asked the agent to label each with what should have been caught, under written guidance.
+
+The set came to a dozen cases. I spent a day or two verifying every label before I trusted it.
+
+No failure here is worth telling, and that is the point. I curated the input and checked each label, because a mislabeled eval set corrupts everything downstream.
+
+## The review skill
+
+A review skill is a reusable package of instructions the agent loads that describes how to judge a change. The design standards lived in Figma and in the design system's own codebase, and the two had drifted. I asked the agent to draft a review skill from them.
+
+The first draft hardcoded rules into the skill. That made a third source of truth that could drift from the other two, and it recreated the problem with lint rules from the other direction: a brittle list that rots and encodes what someone thought of.
+
+I made the design system's codebase the single source of truth, demoted Figma, and had the agent rewrite the skill to point at that codebase and describe how to judge against it, with no rules of its own. The rewritten skill caught drift the hardcoded draft had missed. That codebase holds the intent; the product codebases that consume it show what was done. Encode what a machine can check exactly; describe how to judge the rest. The skill holds the how-to-judge and a pointer to the intent, never a copy of it. Built that way, it improves in one place, and since nothing in it is specific to a repo or a model version it should travel across both, though that is a prediction rather than something I have measured.
+
+## Check the checker
+
+A review skill is a non-deterministic check, so it gets the same treatment as any other: sampling, thresholds, a record of judgments. Give it an eval set and rerun whenever the skill or the model changes: each case with and without the skill, several runs each, graded against written assertions by a grader that is not the skill, reported as pass rate with variance. Each human disagreement recorded in a PR is a new labeled case for the set. A rules file could sit under the same eval set and would still lose, because it copies the standard and drifts from it, while the skill points at the standard and reads it fresh each run.
+
+I ran this loop on the design system review skill, using Anthropic's skill-creator benchmark tooling, on a small set of component tasks. The agent ran the skill as a review pass over its own output before declaring done, and a separate grader agent scored that review against written assertions. I spot-checked the grader's scores against my own reading, and they held. Without the skill, the agent's review caught the design-standard problems 20 to 40 percent of the time. With it, 100 percent.
+
+Without a skill, the agent judges by its training plus the product codebase in front of it, which shows what was done, inconsistencies included. The skill sends it to the design system's codebase instead and tells it how to judge.
+
+The benchmark measured one well-defined standard, design-system conformance. The previous post also claimed that an agent's self-review catches "technically works, isn't what was asked." That a skill helps there too is my extrapolation; I have not measured it.
+
+## Three moves, and who makes them
+
+1. Have the agent write the missing tests and make the deterministic checks one command and fast, with the command where the agent will find it. You prompt the agent to fix anything that asserts content, and plant failures to confirm the suite still catches them.
+2. Have the agent label an eval set from past misses. You verify every label.
+3. Have the agent draft a review skill that points at your source of truth and describes how to judge. You cut any rule it hardcodes. Add the skill to the agent's definition of done, reuse it as the first-pass review on every pull request, and rerun the eval loop whenever the skill or the model changes.
+
+The agents moved the constraint, and they are the cheapest way to elevate it. Let them build the gates and spend your judgment checking them. Checking costs a fraction of building by hand. The rest is the gain.
