@@ -6,7 +6,7 @@ Gates are code. Tests, fixtures, mocks, eval sets, review skills: an agent produ
 
 A gate the agent wrote is itself unvalidated change. You read it like any other agent-written code; this post takes that for granted. Most of the stories below also add a second check on top of that reading. That check is where the judgment goes; skip it and you get a green suite that means nothing.
 
-Four things I had agents build, in the order you would build them: missing tests, a fast suite, an eval set, a review skill. Each story gives the ask, what went wrong, and how I checked it. On the last gate, an agent reviewing without a skill caught 20 to 40 percent of the problems; with the skill, it caught all of them.
+Four things I had agents build, in the order you would build them: missing tests, a fast suite, an eval set, a review skill. Each story gives the ask, what went wrong, and how I checked it. On the last gate, an agent reviewing without a skill caught the problem in 20 to 40 percent of cases; with the skill, it caught it in every case.
 
 ## The missing tests
 
@@ -48,7 +48,7 @@ The split between intent and what was done matters beyond this one skill. The de
 
 A review skill is itself a check whose verdict can vary, so it gets the treatment every such check needs: sampling, thresholds, and a record of judgments. Give it an eval set and rerun whenever the skill or the model changes. Run each case with and without the skill, several times each. Grade against the written assertions with a grader that is not the skill. Report pass rate with variance. Each time a human disagrees with the skill on a PR, that disagreement is a new labeled case for the set. A rules file could sit under the same eval set, and the set would show when the file had gone stale, but only after it had. The skill reads the standard fresh on each run and copies none of it.
 
-I ran this loop on the design system review skill, using Anthropic's skill-creator benchmark tooling. The cases came in two kinds: the dozen past changes from the eval set, which an agent reviewed as they had been submitted, and fresh component changes that one agent wrote and a second agent with a clean context reviewed, graded against the same assertions as the eval set. A separate grader agent scored each review, and I spot-checked its scores against my own reading. Without the skill, the reviewing agent caught the design-standard problems 20 to 40 percent of the time. With it, 100 percent.
+I ran this loop on the design system review skill, using Anthropic's skill-creator benchmark tooling. The cases came in two kinds: the dozen past changes from the eval set, which an agent reviewed as they had been submitted, and fresh component changes that one agent wrote and a second agent with a clean context reviewed, graded against the same assertions as the eval set. A separate grader agent scored each review, and I spot-checked its scores against my own reading. Without the skill, the reviewing agent caught the design-standard problem in 20 to 40 percent of cases. With it, in every case.
 
 The benchmark measured one well-defined standard, design-system conformance. The previous post also claimed that an agent's self-review catches work that technically passes but is not what was asked. That a skill helps there too is my extrapolation; I have not measured it.
 
