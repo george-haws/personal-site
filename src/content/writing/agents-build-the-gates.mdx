@@ -30,7 +30,7 @@ The agent did what I asked, did it well, and still nearly left a maintenance bur
 
 An eval set is a fixed set of cases with written assertions, used to score a non-deterministic check. I gathered cases from past PRs with known problems, plus the existing misses: changes the review process had let through. I asked the agent to label each with what should have been caught, under written guidance.
 
-The set came to a dozen cases. I spent an hour or two verifying every label before I trusted it.
+The set came to a dozen component changes. I spent an hour or two verifying every label before I trusted it.
 
 No failure here is worth telling, and that is the point. I curated the input and checked each label, because a mislabeled eval set corrupts everything downstream.
 
@@ -46,7 +46,7 @@ I made the design system's codebase the single source of truth, demoted Figma, a
 
 A review skill is a non-deterministic check, so it gets the same treatment as any other: sampling, thresholds, a record of judgments. Give it an eval set and rerun whenever the skill or the model changes: each case with and without the skill, several runs each, graded against written assertions by a grader that is not the skill, reported as pass rate with variance. Each human disagreement recorded in a PR is a new labeled case for the set. A rules file could sit under the same eval set and would still lose, because it copies the standard and drifts from it, while the skill points at the standard and reads it fresh each run.
 
-I ran this loop on the design system review skill, using Anthropic's skill-creator benchmark tooling, on a small set of component tasks. The agent ran the skill as a review pass over its own output before declaring done, and a separate grader agent scored that review against written assertions. I spot-checked the grader's scores against my own reading, and they held. Without the skill, the agent's review caught the design-standard problems 20 to 40 percent of the time. With it, 100 percent.
+I ran this loop on the design system review skill, using Anthropic's skill-creator benchmark tooling, against the dozen-case eval set from the third story. The agent ran the skill as a review pass over its own output before declaring done, and a separate grader agent scored that review against written assertions. I spot-checked the grader's scores against my own reading, and they held. Without the skill, the agent's review caught the design-standard problems 20 to 40 percent of the time. With it, 100 percent.
 
 Without a skill, the agent judges by its training plus the product codebase in front of it, which shows what was done, inconsistencies included. The skill sends it to the design system's codebase instead and tells it how to judge.
 
