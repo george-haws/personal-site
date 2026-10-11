@@ -130,6 +130,22 @@ is the render-blocking stylesheet (about 170 ms) and the 41 KB JetBrains Mono wo
 fetched at high priority. Scores are already in the 90s. If wanted, preload the font or
 subset it further. Not worth a layout change.
 
+## Fixes applied (2026-10-11)
+
+Findings 1 to 5 were fixed and verified against a local `next build` served by
+`wrangler dev`, using the same capture script. Finding 6 was left as is.
+
+| # | Change | Verified by |
+|---|---|---|
+| 1 | `/projects` is a single column. The demo `pre` sits in a new `ScrollRegion` client component: `role="region"`, `aria-label`, `tabIndex=0`, and a right-edge fade that shows only while content remains to the right. The `pre` is `w-max min-w-full` so its background spans the scrolled width. | Demo whole at 1440 on `/projects`; fade visible on phones; axe `scrollable-region-focusable` gone. `ScrollRegion.test.tsx`, `TerminalDemo.test.tsx`. |
+| 2 | New `Brand` component: `g_` below `sm`, `> George Haws` from `sm` up, `aria-label` keeps the accessible name constant. | `innerWidth` is 320 at the 320 profile on every route (was 328). Header is one row at 320, 375 and 393. `Brand.test.tsx`. |
+| 3 | `tap-target` utility in `globals.css` (`inline-flex`, `min-height: 44px`, negative block margin so layout does not move) on nav, footer, brand, and inline text links. Brand also gets `min-w-11`. | Zero interactive elements under 24px on any route or profile (was 12 to 14 per page). Remaining under-44 items are the 32px theme toggle and three narrow inline links, all over 24px. |
+| 4 | `ProjectCard` takes `headingLevel`; `/projects` passes `h2`. | axe `heading-order` gone on `/projects`. `ProjectCard.test.tsx`. |
+| 5 | `public/_headers` allows `https://static.cloudflareinsights.com` in `script-src` and adds `connect-src 'self' https://cloudflareinsights.com`. | Header present on the local build. Console check needs the deployed site, since the beacon is injected by Cloudflare. |
+
+The capture script now waits for `load` plus fonts rather than network idle, because a
+dev server keeps sockets open and never goes idle.
+
 ## Not an issue, checked
 
 - Footer wraps to two rows below about 380px by design (`flex-wrap`), and reads fine.

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { JetBrains_Mono } from "next/font/google";
+import { Brand } from "@/components/Brand";
 import { Nav } from "@/components/Nav";
 import { SocialLinks } from "@/components/SocialLinks";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -24,9 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-6">
             <header className="flex items-center justify-between border-b border-border py-4">
               <nav aria-label="Main" className="flex flex-1 items-center justify-between text-sm">
-                <Link href="/" className="font-medium text-foreground before:mr-1.5 before:text-primary before:content-['>']">
-                  {site.name}
-                </Link>
+                <Brand />
                 <Nav />
               </nav>
               <div className="ml-4">

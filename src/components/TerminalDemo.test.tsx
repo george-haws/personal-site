@@ -25,4 +25,11 @@ describe("TerminalDemo", () => {
     expect(screen.getByText("A summary")).toHaveClass("italic");
     expect(screen.getByText("·", { exact: false }).className).toBe("");
   });
+
+  it("sits in a focusable, labelled scroll region", () => {
+    render(<TerminalDemo lines={lines} />);
+    const region = screen.getByRole("region", { name: "Sample terminal output" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toContainElement(screen.getByRole("figure"));
+  });
 });

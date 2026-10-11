@@ -25,11 +25,11 @@ export default function Home() {
           Resume
         </h2>
         <p className="flex gap-4 text-sm">
-          <Link href="/resume" className="text-primary hover:underline">
+          <Link href="/resume" className="tap-target text-primary hover:underline">
             Resume →
           </Link>
           {site.resumePdf ? (
-            <a href={site.resumePdf} className="text-primary hover:underline">
+            <a href={site.resumePdf} className="tap-target text-primary hover:underline">
               PDF
             </a>
           ) : null}

@@ -15,7 +15,7 @@ export function ResumeView({ title, resume, pdfHref }: { title: string; resume: 
       </hgroup>
       {pdfHref ? (
         <p className="mt-3">
-          <a href={pdfHref} className="text-sm text-primary hover:underline">
+          <a href={pdfHref} className="tap-target text-sm text-primary hover:underline">
             Download PDF
           </a>
         </p>

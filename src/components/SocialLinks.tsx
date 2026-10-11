@@ -15,7 +15,7 @@ export function SocialLinks({ links }: { links: SocialLinksType }) {
           <a
             href={item.href}
             {...(item.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-            className="text-muted-foreground transition-colors hover:text-primary"
+            className="tap-target text-muted-foreground transition-colors hover:text-primary"
           >
             {item.label}
           </a>

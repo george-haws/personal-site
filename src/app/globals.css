@@ -4,6 +4,18 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Text links are 18-21px tall, under the 24px WCAG 2.5.8 minimum. This grows the
+ * hit area to 44px without moving the layout: the negative block margin gives
+ * back what min-height adds.
+ */
+@utility tap-target {
+    display: inline-flex;
+    align-items: center;
+    min-height: --spacing(11);
+    margin-block: calc(--spacing(3) * -1);
+}
+
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);

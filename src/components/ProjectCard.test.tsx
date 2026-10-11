@@ -58,4 +58,12 @@ describe("ProjectCard", () => {
     );
     expect(screen.getByRole("figure")).toHaveTextContent("Doing: Run tests (4s)");
   });
+
+  it("renders the title as an h3 by default and as an h2 when asked", () => {
+    const { rerender } = render(<ProjectCard project={base} />);
+    expect(screen.getByRole("heading", { level: 3, name: "Tool" })).toBeInTheDocument();
+    rerender(<ProjectCard project={base} headingLevel="h2" />);
+    expect(screen.getByRole("heading", { level: 2, name: "Tool" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
+  });
 });

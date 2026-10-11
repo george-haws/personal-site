@@ -121,7 +121,8 @@ async function main() {
           // tsx compiles with esbuild keepNames, which wraps nested functions in a
           // __name helper that does not exist inside the page. Provide a no-op.
           await page.addInitScript("window.__name = (fn) => fn;");
-          const response = await page.goto(base + route, { waitUntil: "networkidle" });
+          // "load" plus fonts, not networkidle: dev servers keep sockets open and never go idle.
+          const response = await page.goto(base + route, { waitUntil: "load" });
           await page.evaluate(() => document.fonts.ready);
           // Layout does not depend on theme; collect facts once per profile.
           const facts = theme === "light" ? await page.evaluate(collectLayoutFacts) : undefined;

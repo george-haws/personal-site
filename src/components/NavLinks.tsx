@@ -23,7 +23,7 @@ export function NavLinks({ currentPath }: { currentPath: string }) {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "transition-colors hover:text-primary",
+                "tap-target transition-colors hover:text-primary",
                 active ? "text-primary" : "text-muted-foreground",
               )}
             >

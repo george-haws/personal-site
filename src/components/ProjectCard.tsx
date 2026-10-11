@@ -3,13 +3,20 @@ import type { Project } from "@/lib/types";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { TerminalDemo } from "@/components/TerminalDemo";
 
-export function ProjectCard({ project }: { project: Project }) {
+export function ProjectCard({
+  project,
+  headingLevel: Heading = "h3",
+}: {
+  project: Project;
+  /** h2 when the card sits directly under the page title, h3 under a section heading. */
+  headingLevel?: "h2" | "h3";
+}) {
   const hasLinks = Boolean(project.repoUrl || project.liveUrl);
 
   return (
     <Card>
       <CardHeader>
-        <h3 className="font-medium leading-snug text-foreground">{project.title}</h3>
+        <Heading className="font-medium leading-snug text-foreground">{project.title}</Heading>
         <p className="text-sm text-muted-foreground">{project.summary}</p>
       </CardHeader>
       {project.image ? (
@@ -37,7 +44,7 @@ export function ProjectCard({ project }: { project: Project }) {
               href={project.repoUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline"
+              className="tap-target text-sm text-primary hover:underline"
             >
               Source
             </a>
@@ -54,7 +61,7 @@ export function ProjectCard({ project }: { project: Project }) {
               href={project.liveUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline"
+              className="tap-target text-sm text-primary hover:underline"
             >
               Live
             </a>
