@@ -58,8 +58,9 @@ discovery sees the current output and the artifact tested is the artifact shippe
   "retain-on-failure"`, so local failures also leave a trace. `screenshot:
   "only-on-failure"`. Reporter `list`. Output to `test-results/`.
 - `.gitignore` gains `test-results/`, `playwright-report/`, and `blob-report/`.
-- `CI` is read in four places: channel, retries, trace mode, and `reuseExistingServer`.
-  Nothing else in config or tests branches on environment.
+- `forbidOnly: ci`, so a stray `test.only` cannot shrink a CI run to one test.
+- `CI` is read in five places: channel, retries, trace mode, `reuseExistingServer`, and
+  `forbidOnly`. Nothing else in config or tests branches on environment.
 - Dark mode is set per test with `colorScheme: "dark"` where theme matters, not as extra
   projects. `reducedMotion: "reduce"` is set globally so axe never measures contrast
   mid-transition.
@@ -75,29 +76,31 @@ anything outside its own body: no imports, no module-level helpers, no predicate
 returns raw facts only:
 
 - `viewportMeta`, `innerWidth`, `scrollWidth`, `clientWidth`, `scrollHeight`.
-- `elements`: for every element under `body` with a non-empty bounding box: a
-  description (tag, id, first three classes, first 40 characters of text), its rect, its
-  computed `fontSize`, whether it has an own non-whitespace text node, whether it is
-  rendered (`display` not `none`, `visibility` not `hidden`), whether it is clipped to
-  1×1 (the `sr-only` pattern), whether its own `overflow-x` is `auto` or `scroll`, and
-  the index of its nearest scrolling ancestor, if any.
-- `interactive`: indexes into `elements` for `a[href]`, `button`, `input`, `select`,
-  `textarea`, `summary`, `[role=button]`, and `[tabindex]` not `-1`, each with its
-  `tabindex`, `role`, and accessible name as computed from `aria-label` or text.
+- `elements`: for every element under `body`: a description (tag, id, first three
+  classes, first 40 characters of text), its rect, its computed `fontSize`, whether it
+  has an own non-whitespace text node, whether it is rendered (`display` not `none`,
+  `visibility` not `hidden`, non-empty box), whether it is clipped to 1×1 (the `sr-only`
+  pattern), whether it matches the interactive selector (`a[href]`, `button`, `input`,
+  `select`, `textarea`, `summary`, `[role=button]`, `[tabindex]` not `-1`), and the
+  index of its nearest ancestor below `body` whose `overflow-x` is `auto`, `scroll`,
+  `hidden` or `clip`. No accessible names or subtree text beyond the 40-character
+  description, so the payload stays proportional to element count.
 
 **Node half.** Pure functions over those facts, unit-tested in Vitest with hand-built
 fixtures, no jsdom needed:
 
-- `overflowingElements(facts)`: elements whose right edge passes `innerWidth + 1` or
-  whose left edge is below `-1`, excluding descendants of scrolling ancestors. This is
-  the element-level overflow check that `scrollWidth === clientWidth` alone misses when
-  `overflow-x: hidden` papers over a regression.
-- `smallTargets(facts, indexes)`: among the given interactive indexes, those rendered and
-  not clipped whose width or height is under 24.
-- `tinyText(facts)`: rendered, unclipped elements with an own text node and font size
-  under 12.
-- `scrollRegions(facts)`: scrolling elements whose content overflows, with whether they
-  are focusable (`tabindex="0"`) and named.
+- `overflowingElements(facts)`: rendered elements whose right edge passes
+  `innerWidth + 1` or whose left edge is below `-1`, excluding anything with a containing
+  ancestor. Containment counts `hidden` and `clip` as well as `auto` and `scroll`, because
+  content clipped by a card or an off-canvas panel cannot widen the page; only the root
+  is never a container, which is exactly the case where `overflow-x: hidden` papers over
+  a regression and this check still catches it.
+- `smallTargets(facts, minimum = 24)`: rendered, unclipped interactive elements whose
+  width or height is under the minimum.
+- `tinyText(facts, minimum = 12)`: rendered, unclipped elements with an own text node and
+  font size under the minimum.
+- No scroll-region predicate: axe's `scrollable-region-focusable` already covers
+  focusability, and the demo spec asserts the one region we own directly.
 - `profiles`: the device profile list, `{ name, options }`, with `defaultBrowserType`
   already stripped from the iPhone descriptor. Vitest asserts names are unique and
   viewports positive.
@@ -109,28 +112,32 @@ loader and does not need it.
 
 `e2e/routes.ts` reads `out/**/*.html` when the config loads. Each file becomes a route
 (`index.html` → `/`, `projects.html` → `/projects`, `writing/foo.html` → `/writing/foo`).
-`404.html` and `_not-found.html` are dropped and `/no-such-page` is added with
-`expectedStatus: 404`; every other route expects 200. If no HTML files are found the
+`404.html` and any path with a segment starting with `_` (framework output such as
+`_not-found.html`) are dropped and `/no-such-page` is added with `expectedStatus: 404`;
+every other route expects 200. If no HTML files are found the
 module throws, so a missing build fails loudly instead of generating zero tests.
 
 ## Tests
 
 Each test runs once per project. Every navigation uses `waitUntil: "load"`, then awaits
 `document.fonts.ready`, then asserts the response status matches the route's expected
-status. Never network idle: `wrangler dev` keeps sockets open.
+status. Never network idle: `wrangler dev` keeps sockets open. The shared `open` helper
+also installs a no-op `__name` shim before navigation as insurance for the serialised
+`collectLayoutFacts`, the same shim the audit script needs under `tsx`.
 
 ### `e2e/layout.spec.ts`: one test per route
 
 One navigation, one `collectLayoutFacts()` call, then four `expect.soft` checks so a
 single run reports every failure:
 
-- **No horizontal overflow.** `scrollWidth` equals `clientWidth`, `innerWidth` equals
-  the project viewport width within 1px, and `overflowingElements` is empty. Failure
-  lists offenders.
-- **Site chrome tap targets.** The brand link, each nav link, each footer link, and the
-  theme toggle are at least 24px on both axes. Scoped to chrome we control; inline links
-  in prose are exempt under WCAG 2.5.8 and left to axe, which implements the inline and
-  spacing exceptions.
+- **No horizontal overflow.** `scrollWidth` is within 1px of `clientWidth`,
+  `innerWidth` is within 1px of the project viewport width, and `overflowingElements` is
+  empty. Failure lists offenders.
+- **Site chrome tap targets.** Every visible link and button in the header and every
+  visible link in the footer is at least 24px on both axes. Visibility is filtered first
+  so a breakpoint-hidden control or an `sr-only` skip link is not counted. Scoped to
+  chrome we control; inline links in prose are exempt under WCAG 2.5.8 and left to axe,
+  which implements the inline and spacing exceptions.
 - **Header on one row.** Vertical centres of the brand link, nav links, and theme toggle
   are within 2px of each other.
 - **Readable text.** `tinyText` is empty.
@@ -145,6 +152,8 @@ single run reports every failure:
 
 ### `e2e/demo.spec.ts`: on `/` and `/projects`
 
+- Locators are scoped to the project card that holds the expected heading, so a second
+  demo on a page can never trip strict mode or be asserted by mistake.
 - The terminal demo's scroll region has `role="region"`, an accessible name, and
   `tabindex="0"`.
 - Overflow state is read from the region's `data-overflow` attribute, which
@@ -185,7 +194,9 @@ and this sketch.
 ## Verifying the suite guards what it claims
 
 On a scratch branch, revert one fix at a time, run the suite, record which test actually
-fails and confirm its message names the cause, then restore. Expected failures are a
+fails and confirm its message names the cause, then restore. Each scripted revert is
+guarded by `git diff --quiet`, so a drifted string that changes nothing stops the step
+instead of recording a green run as proof. Expected failures are a
 prediction, not a requirement; the plan records what happened.
 
 | Revert | Expected failure |

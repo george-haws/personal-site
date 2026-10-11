@@ -13,13 +13,14 @@
 ## Global Constraints
 
 - Node: run every command with `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` first. The homebrew `node` on PATH crashes at startup.
-- `npm run check` and `npm test` must never launch a browser: Cloudflare's build runs them without one. Browser tests live only under `e2e/` and run via `npm run test:e2e`.
+- `npm run check` and `npm test` must never launch a browser: Cloudflare's build runs them without one. Browser tests live only under `e2e/` and run via `npm run test:e2e`. Vitest's `include` is already `src/**/*.test.{ts,tsx}`, so `e2e/*.spec.ts` is never collected; do not widen it.
 - `@playwright/test` is pinned to exactly `1.63.0`. No direct `playwright-core` dependency remains.
 - `collectLayoutFacts` is serialised with `toString()` for `page.evaluate`. It must not reference anything outside its own body: no imports, no module-level helpers, no other exports.
 - All navigations use `waitUntil: "load"` then await `document.fonts.ready`. Never `networkidle`.
-- `CI` is read in exactly four places in `playwright.config.ts`: browser channel, retries, trace mode, `reuseExistingServer`.
+- `CI` is read in exactly five places in `playwright.config.ts`: browser channel, retries, trace mode, `reuseExistingServer`, `forbidOnly`.
+- Every scripted source edit in a verification step is followed by `git diff --quiet && { echo "edit did not apply"; exit 1; }` so a drifted string cannot turn into a silent no-op.
 - Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
-- Pixel tolerances: 1px for overflow and viewport width, 2px for the header row.
+- Pixel tolerances: 1px for overflow, scroll width, and viewport width; 2px for the header row.
 
 ---
 
@@ -33,6 +34,7 @@
 | `src/lib/routes-from-build.test.ts` | Vitest for that mapping |
 | `e2e/routes.ts` | Reads `out/`, applies the mapping, throws if nothing found |
 | `e2e/helpers.ts` | `open(page, route)`: navigate, wait for fonts, assert status |
+| `e2e/smoke.spec.ts` | Every route responds with its expected status and renders an `h1` |
 | `e2e/layout.spec.ts` | One test per route: overflow, chrome tap targets, header row, tiny text |
 | `e2e/a11y.spec.ts` | One test per route per theme: axe with `target-size`, no tag filter |
 | `e2e/demo.spec.ts` | Terminal demo region: focusable, named, overflow and fade state, heading level |
@@ -47,7 +49,7 @@
 ### Task 1: Swap `playwright-core` for a pinned `@playwright/test`
 
 **Files:**
-- Modify: `package.json` (devDependencies, scripts)
+- Modify: `package.json` (devDependencies)
 - Modify: `scripts/build-resume.ts:3`
 - Modify: `scripts/audit-responsive.ts:3-5`
 - Modify: `.gitignore`
@@ -119,7 +121,7 @@ npm run check
 npm run resume
 ```
 
-Expected: check passes (81 tests). `npm run resume` prints `Wrote docs/resume-ic.md` then `PDF up to date` (or reprints if the HTML changed; either is fine). `git status` shows no change to `public/resume.pdf` unless it reprinted.
+Expected: check passes (81 tests). `npm run resume` prints `Wrote docs/resume-ic.md` then `PDF up to date` (or reprints if the HTML changed; either is fine).
 
 - [ ] **Step 6: Commit**
 
@@ -157,20 +159,14 @@ export const profiles: Profile[];
 export type Rect = { left: number; top: number; right: number; bottom: number; width: number; height: number };
 export type ElementFact = {
   index: number;
-  description: string;
+  description: string;     // tag, id, first three classes, first 40 chars of text
   rect: Rect;
   fontSize: number;
-  hasOwnText: boolean;
-  rendered: boolean;      // display != none, visibility != hidden, non-empty box
-  clipped: boolean;       // 1x1 or smaller: the sr-only pattern
-  interactive: boolean;   // matches the interactive selector
-  tabIndex: string | null;
-  role: string | null;
-  name: string;           // aria-label, else trimmed text, else ""
-  scrolls: boolean;       // own overflow-x is auto or scroll
-  scrollWidth: number;
-  clientWidth: number;
-  scrollAncestor: number | null; // index of nearest ancestor with scrolls
+  hasOwnText: boolean;     // has a non-whitespace text node of its own
+  rendered: boolean;       // display != none, visibility != hidden, non-empty box
+  clipped: boolean;        // 1x1 or smaller: the sr-only pattern
+  interactive: boolean;    // matches the interactive selector
+  containedBy: number | null; // index of the nearest ancestor (below body) whose overflow-x is auto, scroll, hidden or clip
 };
 export type LayoutFacts = {
   title: string;
@@ -186,8 +182,6 @@ export function collectLayoutFacts(): LayoutFacts;          // browser side (Tas
 export function overflowingElements(facts: LayoutFacts): ElementFact[];
 export function smallTargets(facts: LayoutFacts, minimum?: number): ElementFact[];
 export function tinyText(facts: LayoutFacts, minimum?: number): ElementFact[];
-export type ScrollRegionFact = { element: ElementFact; overflows: boolean; focusable: boolean; named: boolean };
-export function scrollRegions(facts: LayoutFacts): ScrollRegionFact[];
 ```
 
 - [ ] **Step 1: Write the failing tests**
@@ -199,7 +193,6 @@ import { describe, expect, it } from "vitest";
 import {
   overflowingElements,
   profiles,
-  scrollRegions,
   smallTargets,
   tinyText,
   type ElementFact,
@@ -219,13 +212,7 @@ function element(overrides: Overrides): ElementFact {
     rendered: true,
     clipped: false,
     interactive: false,
-    tabIndex: null,
-    role: null,
-    name: "",
-    scrolls: false,
-    scrollWidth: width,
-    clientWidth: width,
-    scrollAncestor: null,
+    containedBy: null,
     ...overrides,
     rect: { left, top, width, height, right: left + width, bottom: top + height },
   };
@@ -272,10 +259,10 @@ describe("overflowingElements", () => {
     expect(overflowingElements(f).map((e) => e.index)).toEqual([2, 3]);
   });
 
-  it("ignores descendants of scroll regions and unrendered elements", () => {
+  it("ignores contained and unrendered elements", () => {
     const f = facts([
-      element({ index: 0, scrolls: true, rect: { left: 0, top: 0, width: 320, height: 50 } }),
-      element({ index: 1, scrollAncestor: 0, rect: { left: 0, top: 0, width: 600, height: 10 } }),
+      element({ index: 0, rect: { left: 0, top: 0, width: 320, height: 50 } }),
+      element({ index: 1, containedBy: 0, rect: { left: 0, top: 0, width: 600, height: 10 } }),
       element({ index: 2, rendered: false, rect: { left: 0, top: 0, width: 600, height: 10 } }),
     ]);
     expect(overflowingElements(f)).toEqual([]);
@@ -307,20 +294,6 @@ describe("tinyText", () => {
       element({ index: 4, hasOwnText: true, fontSize: 8, rendered: false }),
     ]);
     expect(tinyText(f).map((e) => e.index)).toEqual([0]);
-  });
-});
-
-describe("scrollRegions", () => {
-  it("reports overflow, focusability and naming for each scrolling element", () => {
-    const f = facts([
-      element({ index: 0, scrolls: true, scrollWidth: 600, clientWidth: 300, tabIndex: "0", name: "Sample" }),
-      element({ index: 1, scrolls: true, scrollWidth: 300, clientWidth: 300 }),
-      element({ index: 2, scrolls: false, scrollWidth: 900, clientWidth: 300 }),
-    ]);
-    expect(scrollRegions(f)).toEqual([
-      { element: f.elements[0], overflows: true, focusable: true, named: true },
-      { element: f.elements[1], overflows: false, focusable: false, named: false },
-    ]);
   });
 });
 ```
@@ -357,14 +330,14 @@ export type ProfileOptions = {
 
 export type Profile = { name: string; options: ProfileOptions };
 
-const phone = { deviceScaleFactor: 2, isMobile: true, hasTouch: true };
+const touch = { deviceScaleFactor: 2, isMobile: true, hasTouch: true };
 
 /** Device profiles. The iPhone 15 values match Playwright's descriptor minus its WebKit default. */
 export const profiles: Profile[] = [
-  { name: "phone-320", options: { viewport: { width: 320, height: 568 }, ...phone } },
-  { name: "phone-375", options: { viewport: { width: 375, height: 667 }, ...phone } },
+  { name: "phone-320", options: { viewport: { width: 320, height: 568 }, ...touch } },
+  { name: "phone-375", options: { viewport: { width: 375, height: 667 }, ...touch } },
   { name: "iphone-15", options: { viewport: { width: 393, height: 659 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true } },
-  { name: "tablet-768", options: { viewport: { width: 768, height: 1024 }, ...phone } },
+  { name: "tablet-768", options: { viewport: { width: 768, height: 1024 }, ...touch } },
   { name: "laptop-1024", options: { viewport: { width: 1024, height: 768 } } },
   { name: "desktop-1440", options: { viewport: { width: 1440, height: 900 } } },
 ];
@@ -373,25 +346,22 @@ export type Rect = { left: number; top: number; right: number; bottom: number; w
 
 export type ElementFact = {
   index: number;
+  /** tag, id, first three classes, first 40 characters of text. */
   description: string;
   rect: Rect;
   fontSize: number;
+  /** Has a non-whitespace text node of its own. */
   hasOwnText: boolean;
   /** display is not none, visibility is not hidden, and the box is non-empty. */
   rendered: boolean;
   /** 1x1 or smaller: the sr-only pattern. */
   clipped: boolean;
   interactive: boolean;
-  tabIndex: string | null;
-  role: string | null;
-  /** aria-label, else trimmed text, else "". */
-  name: string;
-  /** Own overflow-x is auto or scroll. */
-  scrolls: boolean;
-  scrollWidth: number;
-  clientWidth: number;
-  /** Index of the nearest ancestor with `scrolls`, or null. */
-  scrollAncestor: number | null;
+  /**
+   * Index of the nearest ancestor below body whose overflow-x is auto, scroll,
+   * hidden or clip, or null. Content inside such an ancestor cannot widen the page.
+   */
+  containedBy: number | null;
 };
 
 export type LayoutFacts = {
@@ -410,12 +380,12 @@ export function collectLayoutFacts(): LayoutFacts {
   throw new Error("not implemented");
 }
 
-/** Rendered elements past either viewport edge, excluding content inside scroll regions. */
+/** Rendered, uncontained elements past either viewport edge. */
 export function overflowingElements(facts: LayoutFacts): ElementFact[] {
   return facts.elements.filter(
     (e) =>
       e.rendered &&
-      e.scrollAncestor === null &&
+      e.containedBy === null &&
       (e.rect.right > facts.innerWidth + 1 || e.rect.left < -1),
   );
 }
@@ -431,20 +401,6 @@ export function smallTargets(facts: LayoutFacts, minimum = 24): ElementFact[] {
 export function tinyText(facts: LayoutFacts, minimum = 12): ElementFact[] {
   return facts.elements.filter((e) => e.hasOwnText && e.rendered && !e.clipped && e.fontSize < minimum);
 }
-
-export type ScrollRegionFact = { element: ElementFact; overflows: boolean; focusable: boolean; named: boolean };
-
-/** Every element that scrolls horizontally, with what the a11y rules want to know about it. */
-export function scrollRegions(facts: LayoutFacts): ScrollRegionFact[] {
-  return facts.elements
-    .filter((e) => e.scrolls)
-    .map((element) => ({
-      element,
-      overflows: element.scrollWidth > element.clientWidth + 1,
-      focusable: element.tabIndex === "0",
-      named: element.name.length > 0,
-    }));
-}
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -453,7 +409,7 @@ export function scrollRegions(facts: LayoutFacts): ScrollRegionFact[] {
 npx vitest run src/lib/layout-checks.test.ts
 ```
 
-Expected: PASS, 7 tests.
+Expected: PASS, 6 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -476,7 +432,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: types and predicates from Task 2.
 - Produces: a working `collectLayoutFacts()` that returns `LayoutFacts` when passed to `page.evaluate`.
 
-There is no jsdom test for this function: it depends on real layout. The audit script run in Step 3 is its test, and Task 5's e2e suite exercises it on every route.
+There is no jsdom test for this function: it depends on real layout. The audit script run in Step 3 is its test, and Task 6's e2e suite exercises it on every route.
 
 - [ ] **Step 1: Replace the stub**
 
@@ -505,10 +461,8 @@ export function collectLayoutFacts(): LayoutFacts {
   };
   const round = (n: number) => Math.round(n * 100) / 100;
 
-  const scrolls = all.map((el) => {
-    const overflowX = getComputedStyle(el).overflowX;
-    return overflowX === "auto" || overflowX === "scroll";
-  });
+  const containing = ["auto", "scroll", "hidden", "clip"];
+  const contains = all.map((el) => containing.includes(getComputedStyle(el).overflowX));
 
   const elements: ElementFact[] = all.map((el, index) => {
     const style = getComputedStyle(el);
@@ -516,16 +470,14 @@ export function collectLayoutFacts(): LayoutFacts {
     const hasOwnText = Array.from(el.childNodes).some(
       (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 0,
     );
-    let scrollAncestor: number | null = null;
+    let containedBy: number | null = null;
     for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
       const i = indexOf.get(p);
-      if (i !== undefined && scrolls[i]) {
-        scrollAncestor = i;
+      if (i !== undefined && contains[i]) {
+        containedBy = i;
         break;
       }
     }
-    const ariaLabel = el.getAttribute("aria-label")?.trim();
-    const text = (el.textContent ?? "").trim().replace(/\s+/g, " ");
     return {
       index,
       description: describe(el),
@@ -542,13 +494,7 @@ export function collectLayoutFacts(): LayoutFacts {
       rendered: style.display !== "none" && style.visibility !== "hidden" && r.width > 0 && r.height > 0,
       clipped: r.width <= 1 && r.height <= 1,
       interactive: el.matches(interactiveSelector),
-      tabIndex: el.getAttribute("tabindex"),
-      role: el.getAttribute("role"),
-      name: ariaLabel || text,
-      scrolls: scrolls[index],
-      scrollWidth: el.scrollWidth,
-      clientWidth: el.clientWidth,
-      scrollAncestor,
+      containedBy,
     };
   });
 
@@ -566,7 +512,7 @@ export function collectLayoutFacts(): LayoutFacts {
 }
 ```
 
-Note the body uses `ElementFact` and `LayoutFacts` as type annotations only. Types are erased, so the serialised function has no dangling references.
+`ElementFact` and `LayoutFacts` appear only as type annotations. Types are erased, so the serialised function has no dangling references.
 
 - [ ] **Step 2: Rewrite the audit script on top of the module**
 
@@ -694,7 +640,7 @@ f=[r for r in rs if r['facts']][0]['facts']
 print('innerWidth', f['innerWidth'], 'interactive', f['interactiveCount'], 'small', len(f['smallTargets']), 'overflowing', len(f['overflowing']))"
 ```
 
-Expected: 12 lines ending `Wrote audit-out/results.json`; the summary prints `innerWidth 320`, a positive interactive count, and numbers (not an error). If the deployed site predates the tap-target fix, `small` may be non-zero; that is the site, not the function.
+Expected: 12 lines ending `Wrote audit-out/results.json`; the summary prints `innerWidth 320`, a positive interactive count, and numbers rather than an error. If the deployed site predates the tap-target fix, `small` may be non-zero; that is the site, not the function.
 
 - [ ] **Step 4: Typecheck and lint**
 
@@ -733,7 +679,16 @@ export function routesFromFiles(htmlFiles: string[]): Route[]; // throws if none
 export const routes: Route[];
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Look at what the export actually produces**
+
+```bash
+export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH
+npm run -s build >/dev/null 2>&1; cd out && find . -name '*.html' | sort; cd ..
+```
+
+Expected today: `./404.html`, `./_not-found.html`, `./index.html`, `./projects.html`, `./resume.html`, `./writing.html`, and one file per post under `./writing/`. If anything else appears (a file from `public/`, for instance), add it to the test fixture below and decide whether it is a page.
+
+- [ ] **Step 2: Write the failing test**
 
 Create `src/lib/routes-from-build.test.ts`:
 
@@ -750,6 +705,7 @@ describe("routesFromFiles", () => {
       "writing/fast-validation.html",
       "404.html",
       "_not-found.html",
+      "_next/static/anything.html",
     ]);
     expect(routes).toEqual([
       { path: "/", expectedStatus: 200 },
@@ -769,28 +725,31 @@ describe("routesFromFiles", () => {
 
   it("throws when the build produced no pages", () => {
     expect(() => routesFromFiles([])).toThrow(/no pages/i);
-    expect(() => routesFromFiles(["404.html"])).toThrow(/no pages/i);
+    expect(() => routesFromFiles(["404.html", "_not-found.html"])).toThrow(/no pages/i);
   });
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [ ] **Step 3: Run it to verify it fails**
 
 ```bash
-export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH
 npx vitest run src/lib/routes-from-build.test.ts
 ```
 
 Expected: FAIL, cannot resolve `@/lib/routes-from-build`.
 
-- [ ] **Step 3: Implement the mapping**
+- [ ] **Step 4: Implement the mapping**
 
 Create `src/lib/routes-from-build.ts`:
 
 ```ts
 export type Route = { path: string; expectedStatus: number };
 
-const skipped = new Set(["404.html", "_not-found.html"]);
+/** Next's error page. Anything with a segment starting with `_` is framework output, not a page. */
+function isPage(file: string): boolean {
+  if (!file.endsWith(".html") || file === "404.html") return false;
+  return !file.split("/").some((segment) => segment.startsWith("_"));
+}
 
 /**
  * Turns the HTML files of a Next static export (paths relative to out/, forward
@@ -799,7 +758,7 @@ const skipped = new Set(["404.html", "_not-found.html"]);
  */
 export function routesFromFiles(htmlFiles: string[]): Route[] {
   const pages = htmlFiles
-    .filter((file) => file.endsWith(".html") && !skipped.has(file))
+    .filter(isPage)
     .map((file) => file.replace(/\.html$/, "").replace(/(^|\/)index$/, ""))
     .map((stem) => (stem === "" ? "/" : `/${stem}`))
     .sort((a, b) => (a === "/" ? -1 : b === "/" ? 1 : a.localeCompare(b)))
@@ -811,7 +770,7 @@ export function routesFromFiles(htmlFiles: string[]): Route[] {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [ ] **Step 5: Run the test to verify it passes**
 
 ```bash
 npx vitest run src/lib/routes-from-build.test.ts
@@ -819,7 +778,7 @@ npx vitest run src/lib/routes-from-build.test.ts
 
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Add the filesystem reader for the suite**
+- [ ] **Step 6: Add the filesystem reader for the suite**
 
 Create `e2e/routes.ts`:
 
@@ -828,7 +787,9 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import { routesFromFiles, type Route } from "../src/lib/routes-from-build";
 
-const outDir = path.resolve(__dirname, "..", "out");
+// Resolved from the working directory, like the audit script. Playwright runs from
+// the repo root, where the config lives.
+const outDir = path.resolve("out");
 
 function htmlFilesUnder(dir: string): string[] {
   let entries;
@@ -847,7 +808,7 @@ export const routes: Route[] = routesFromFiles(htmlFilesUnder(outDir));
 export type { Route };
 ```
 
-- [ ] **Step 6: Typecheck and commit**
+- [ ] **Step 7: Typecheck and commit**
 
 ```bash
 npm run typecheck && npm run lint
@@ -879,13 +840,15 @@ Create `playwright.config.ts`:
 import { defineConfig } from "@playwright/test";
 import { profiles } from "./src/lib/layout-checks";
 
-// CI is read in exactly four places below: channel, retries, trace, reuseExistingServer.
+// CI is read in exactly five places below: channel, retries, trace,
+// reuseExistingServer, forbidOnly. Nothing else branches on environment.
 const ci = Boolean(process.env.CI);
 const baseURL = "http://localhost:8787";
 
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
+  forbidOnly: ci,
   retries: ci ? 1 : 0,
   reporter: "list",
   outputDir: "test-results",
@@ -905,7 +868,7 @@ export default defineConfig({
   })),
   // The build runs before this config loads (see the test:e2e script), so the
   // server only serves. wrangler dev reads out/ from disk, which is why reusing a
-  // running server is safe locally.
+  // running server is safe locally (verified in Task 5, Step 6).
   webServer: {
     command: "npx wrangler dev --port 8787",
     url: baseURL,
@@ -928,6 +891,9 @@ import type { Route } from "./routes";
  * networkidle, which wrangler dev never reaches), and assert the expected status.
  */
 export async function open(page: Page, route: Route): Promise<Response> {
+  // Insurance for collectLayoutFacts, which must survive toString(): if a future
+  // transform wraps nested functions in a __name helper, the page has one.
+  await page.addInitScript("window.__name = window.__name ?? ((fn) => fn);");
   const response = await page.goto(route.path, { waitUntil: "load" });
   expect(response, `no response for ${route.path}`).not.toBeNull();
   expect(response!.status(), `status for ${route.path}`).toBe(route.expectedStatus);
@@ -974,19 +940,20 @@ Expected: the build output, then `[WebServer]` lines from wrangler, then the lis
 
 - [ ] **Step 6: Verify a reused server sees a fresh build**
 
-With no server running, start one by hand, then build a changed page and run against it:
+With no server running, start one by hand, then build a changed page and run against it. The `git diff --quiet` guard makes sure the edit really happened before anything is concluded from it.
 
 ```bash
 npx wrangler dev --port 8787 > /dev/null 2>&1 &
 sleep 5
 sed -i '' 's/There is nothing at this address./Nothing lives at this address./' src/app/not-found.tsx
+git diff --quiet && { echo "edit did not apply"; exit 1; }
 npm run test:e2e -- --project=phone-320 --grep "no-such-page" 2>&1 | tail -3
 curl -s http://localhost:8787/no-such-page | grep -o "Nothing lives at this address" | head -1
 git checkout src/app/not-found.tsx
 pkill -f "wrangler dev --port 8787"
 ```
 
-Expected: the test passes and `curl` prints the new sentence, proving the running server served the rebuilt file. If `curl` prints nothing, change `reuseExistingServer` to `false` in the config and note why in its comment.
+Expected: the test passes and `curl` prints the new sentence, proving the running server served the rebuilt file. If `curl` prints nothing, change `reuseExistingServer` to `false` in the config and update its comment to say why.
 
 - [ ] **Step 7: Typecheck, lint, commit**
 
@@ -1020,8 +987,9 @@ import { routes } from "./routes";
 
 type Measured = { label: string; box: { x: number; y: number; width: number; height: number } | null };
 
-async function measure(locator: Locator): Promise<Measured[]> {
-  const items = await locator.all();
+/** Bounding boxes of the visible matches. A visible element with no box is still reported. */
+async function measureVisible(locator: Locator): Promise<Measured[]> {
+  const items = await locator.filter({ visible: true }).all();
   return Promise.all(
     items.map(async (item) => ({
       label: (await item.getAttribute("aria-label")) ?? (await item.innerText()).trim(),
@@ -1036,16 +1004,17 @@ for (const route of routes) {
     const facts = await page.evaluate(collectLayoutFacts);
     const viewportWidth = page.viewportSize()!.width;
 
-    // 1. No horizontal overflow, measured three ways so overflow-x: hidden cannot hide it.
+    // 1. No horizontal overflow, measured three ways so overflow-x: hidden on the
+    //    root cannot hide it. 1px of slack for sub-pixel rounding.
     expect.soft(facts.innerWidth, "layout viewport widened past the device width").toBeLessThanOrEqual(viewportWidth + 1);
-    expect.soft(facts.scrollWidth, "document scrolls horizontally").toBeLessThanOrEqual(facts.clientWidth);
+    expect.soft(facts.scrollWidth, "document scrolls horizontally").toBeLessThanOrEqual(facts.clientWidth + 1);
     expect
       .soft(overflowingElements(facts).map((e) => `${e.description} right=${e.rect.right}`), "elements past the viewport edge")
       .toEqual([]);
 
     // 2. Site chrome tap targets: things we control, not inline prose links (axe covers those).
-    const header = await measure(page.locator("header a, header button"));
-    const footer = await measure(page.locator("footer a"));
+    const header = await measureVisible(page.locator("header a, header button"));
+    const footer = await measureVisible(page.locator("footer a"));
     const small = [...header, ...footer]
       .filter((m) => !m.box || m.box.width < 24 || m.box.height < 24)
       .map((m) => `${m.label}: ${m.box ? `${m.box.width}x${m.box.height}` : "no box"}`);
@@ -1157,7 +1126,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Create: `e2e/demo.spec.ts`
 
 **Interfaces:**
-- Consumes: `open` (Task 5); `projects` from `src/data/projects`; the `ScrollRegion` contract: `role="region"`, `aria-label`, `tabindex="0"`, `data-overflow="true"|"false"`, and a fade that hides via `opacity: 0`.
+- Consumes: `open` (Task 5); `projects` from `src/data/projects`; the `ScrollRegion` contract: `role="region"`, `aria-label`, `tabindex="0"`, `data-overflow="true"|"false"`, a sibling fade with `data-slot="scroll-fade"` that hides via `opacity: 0`; the shadcn `Card` root carries `data-slot="card"`.
 
 - [ ] **Step 1: Write the failing unit assertion for the fade slot**
 
@@ -1226,8 +1195,14 @@ for (const { path, headingLevel, project } of cases) {
     test.skip(!project, "no project with a demo in src/data/projects.ts");
     await open(page, { path, expectedStatus: 200 });
 
-    const region = page.getByRole("region", { name: "Sample terminal output" });
-    const fade = page.locator('[data-slot="scroll-fade"]');
+    // Scope everything to this project's card so a second demo on the page can
+    // never trip strict mode or get asserted by mistake.
+    const heading = page.getByRole("heading", { level: headingLevel, name: project!.title });
+    const card = page.locator('[data-slot="card"]').filter({ has: heading });
+    const region = card.getByRole("region", { name: "Sample terminal output" });
+    const fade = region.locator("..").locator('[data-slot="scroll-fade"]');
+
+    await expect(heading).toBeVisible();
     await expect(region).toHaveAttribute("tabindex", "0");
 
     // Playwright's toBeHidden treats opacity 0 as visible, so read the attribute the
@@ -1244,8 +1219,6 @@ for (const { path, headingLevel, project } of cases) {
       await expect(region).toHaveAttribute("data-overflow", "false");
       await expect(fade).toHaveCSS("opacity", "0");
     }
-
-    await expect(page.getByRole("heading", { level: headingLevel, name: project!.title })).toBeVisible();
   });
 }
 ```
@@ -1299,7 +1272,8 @@ browser. `npm run test:e2e:ui` opens Playwright's UI against the last build.
 To run it in GitHub Actions later: check out, set up Node 24, `npm ci`,
 `npx playwright install --with-deps chromium`, then `CI=1 npm run test:e2e`, and upload
 `test-results/` on failure. The config and tests need no changes; `CI` switches the
-browser to Playwright's Chromium, adds one retry, and stops reusing a running server.
+browser to Playwright's Chromium, adds one retry, forbids `test.only`, and stops reusing
+a running server.
 
 `scripts/audit-responsive.ts` shares the measurement code with the suite and produces
 screenshots plus a `results.json` for a one-off review of any URL:
@@ -1324,7 +1298,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-10-11-responsive-e2e-suite.md` (append a "Verification log" section with the results)
 
-Work on a scratch branch. For each row, apply the revert, run the two fastest relevant projects, record the first failing test name and the key line of its message, then restore. Each run rebuilds, so expect about a minute per row.
+Work on a scratch branch off whatever branch holds Tasks 1 to 9. Every revert is a scripted edit against exact source text, so each one is followed by a `git diff --quiet` guard: if the text has drifted and nothing changed, the step stops instead of recording a green run as proof. For each row, apply the revert, run the fastest relevant projects, record the first failing test name and the key line of its message, then restore. Each run rebuilds, so expect about a minute per row.
 
 - [ ] **Step 1: Branch**
 
@@ -1337,6 +1311,7 @@ git checkout -b scratch/e2e-verification
 
 ```bash
 sed -i '' 's/<div className="mt-6 grid gap-4">/<div className="mt-6 grid gap-4 sm:grid-cols-2">/' src/app/projects/page.tsx
+git diff --quiet && { echo "edit did not apply"; exit 1; }
 npm run test:e2e -- --project=desktop-1440 demo 2>&1 | grep -E "✘|Error|expected|Received" | head -6
 git checkout src/app/projects/page.tsx
 ```
@@ -1347,6 +1322,7 @@ Expected: the `/projects` demo test fails on `data-overflow` expected `"false"`,
 
 ```bash
 sed -i '' 's/"tap-target transition-colors hover:text-primary"/"transition-colors hover:text-primary"/' src/components/NavLinks.tsx
+git diff --quiet && { echo "edit did not apply"; exit 1; }
 npm run test:e2e -- --project=phone-375 layout 2>&1 | grep -E "✘|site chrome|About|Writing|Resume" | head -8
 git checkout src/components/NavLinks.tsx
 ```
@@ -1361,6 +1337,7 @@ p="src/components/Brand.tsx"; s=open(p).read()
 s=s.replace('<span className="font-semibold sm:hidden">g_</span>\n      ', '').replace('className="hidden before:mr-1.5', 'className="before:mr-1.5').replace(" sm:inline\"", "\"")
 open(p,"w").write(s)
 EOF
+git diff --quiet && { echo "edit did not apply"; exit 1; }
 npm run test:e2e -- --project=phone-320 layout 2>&1 | grep -E "✘|widened|wraps|past the viewport" | head -6
 git checkout src/components/Brand.tsx
 ```
@@ -1373,6 +1350,7 @@ Expected: phone-320 layout tests fail. Record whether the failing line is "layou
 python3 - <<'EOF'
 p="src/components/ScrollRegion.tsx"; s=open(p).read(); open(p,"w").write(s.replace("        tabIndex={0}\n", ""))
 EOF
+git diff --quiet && { echo "edit did not apply"; exit 1; }
 npm run test:e2e -- --project=phone-375 demo a11y 2>&1 | grep -E "✘|tabindex|scrollable-region" | head -6
 git checkout src/components/ScrollRegion.tsx
 ```
@@ -1383,13 +1361,21 @@ Expected: the demo test fails on `tabindex`, and the a11y tests for `/` and `/pr
 
 ```bash
 sed -i '' 's/ headingLevel="h2"//' src/app/projects/page.tsx
+git diff --quiet && { echo "edit did not apply"; exit 1; }
 npm run test:e2e -- --project=desktop-1440 demo a11y 2>&1 | grep -E "✘|heading-order|heading" | head -6
 git checkout src/app/projects/page.tsx
 ```
 
 Expected: the `/projects` demo test fails to find the level-2 heading, and its a11y test fails with `heading-order`.
 
-- [ ] **Step 7: Record and return**
+- [ ] **Step 7: Return to the working branch, then record**
+
+The scratch branch holds nothing worth keeping. Switch back first, then write the log on the branch that has the suite.
+
+```bash
+git checkout -
+git branch -D scratch/e2e-verification
+```
 
 Append to the plan file a section:
 
@@ -1408,15 +1394,11 @@ Append to the plan file a section:
 with the observed values filled in, then:
 
 ```bash
-git checkout main
-git branch -D scratch/e2e-verification
 git add docs/superpowers/plans/2026-10-11-responsive-e2e-suite.md
 git commit -m "Record which e2e test catches each reverted fix
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
-
-Note: the plan file edit happens on `main` after switching back; the scratch branch holds nothing worth keeping.
 
 - [ ] **Step 8: Final full run**
 
@@ -1424,4 +1406,4 @@ Note: the plan file edit happens on `main` after switching back; the scratch bra
 npm run check && npm run test:e2e 2>&1 | tail -3
 ```
 
-Expected: check passes with the new unit tests (86 or more), and the suite reports `180 passed`.
+Expected: check passes with the new unit tests (85 or more), and the suite reports `180 passed`.
