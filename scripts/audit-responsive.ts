@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import { chromium, devices, type BrowserContextOptions } from "playwright-core";
+import { chromium, devices, type BrowserContextOptions } from "@playwright/test";
 import { site } from "@/data/site";
 
 // Captures the deployed site across device profiles and themes, then records

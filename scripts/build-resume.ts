@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { chromium } from "playwright-core";
+import { chromium } from "@playwright/test";
 import { icResume } from "@/data/resume";
 import { site } from "@/data/site";
 import { renderResumeHtml } from "@/lib/resume-html";

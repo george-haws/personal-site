@@ -48,3 +48,8 @@ next-env.d.ts
 
 # responsive audit captures
 /audit-out/
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
