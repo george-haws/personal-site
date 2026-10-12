@@ -41,14 +41,16 @@ overflow, header on one row, site chrome tap targets of at least 24px, no text u
 demo is keyboard-reachable and signals when it scrolls.
 
 Locally it drives your installed Chrome and downloads nothing. `npm run deploy` runs it
-before shipping. It is not part of `npm run check`, because Cloudflare's build has no
-browser. `npm run test:e2e:ui` opens Playwright's UI against the last build.
+before shipping; a push to `main` deploys through Cloudflare's build, which runs
+`npm run check && npm run build` with no browser and so skips this suite until a GitHub
+Actions workflow gates it. `npm run test:e2e:ui` opens Playwright's UI against the last
+build.
 
 To run it in GitHub Actions later: check out, set up Node 24, `npm ci`,
 `npx playwright install --with-deps chromium`, then `CI=1 npm run test:e2e`, and upload
 `test-results/` on failure. The config and tests need no changes; `CI` switches the
-browser to Playwright's Chromium, adds one retry, forbids `test.only`, and stops reusing
-a running server.
+browser to Playwright's Chromium, adds one retry, records traces only on retry instead of
+on every failure, forbids `test.only`, and stops reusing a running server.
 
 `scripts/audit-responsive.ts` shares the measurement code with the suite and produces
 screenshots plus a `results.json` for a one-off review of any URL:
