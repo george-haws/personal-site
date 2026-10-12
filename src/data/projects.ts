@@ -6,7 +6,7 @@ export const projects: Project[] = [
     summary:
       "A versioned Claude Code config: a hook that catches every spec and plan, and a second model that reviews them before I do.",
     description:
-      "Settings are rendered by chezmoi from a shared file plus an uncommitted per-machine overlay, with permission lists unioned the way Claude Code merges them. A PostToolUse hook watches writes to superpowers specs and plans, including shell redirects and in-place edits, and injects a nudge to run the cross-model review; inside a subagent it says to report the change instead, so only the caller reviews. The review skill dispatches a read-only reviewer agent on a different model with a clean context, then walks through its findings one at a time.",
+      "chezmoi renders the settings from a shared file and a per-machine overlay that never gets committed. A PostToolUse hook catches writes to superpowers specs and plans, however they happen, and nudges the session to run the cross-model review. Subagents get a different nudge: report the change up and let the caller review. The review goes to a read-only agent on a second model with a clean context, and the skill walks me through its findings one at a time.",
     tech: ["Bash", "jq", "chezmoi", "Claude Code hooks", "Claude Code skills"],
     repoUrl: "https://github.com/george-haws/dotfiles/tree/master/private_dot_claude",
     demo: [
