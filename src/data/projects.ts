@@ -4,7 +4,7 @@ export const projects: Project[] = [
   {
     title: "Claude Code setup",
     summary:
-      "A versioned Claude Code config: a hook that catches every spec and plan, and a second model that reviews it before I do.",
+      "A versioned Claude Code config: a hook that catches every spec and plan, and a second model that reviews them before I do.",
     description:
       "Settings are rendered by chezmoi from a shared file plus an uncommitted per-machine overlay, with permission lists unioned the way Claude Code merges them. A PostToolUse hook watches writes to superpowers specs and plans, including shell redirects and in-place edits, and injects a nudge to run the cross-model review; inside a subagent it says to report the change instead, so only the caller reviews. The review skill dispatches a read-only reviewer agent on a different model with a clean context, then walks through its findings one at a time.",
     tech: ["Bash", "jq", "chezmoi", "Claude Code hooks", "Claude Code skills"],
