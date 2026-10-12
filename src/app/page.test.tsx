@@ -12,8 +12,12 @@ describe("Home", () => {
   it("shows the featured projects with their sample output", () => {
     render(<Home />);
     expect(screen.getByRole("heading", { name: "Featured projects" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Claude Code setup" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Claude Code status line" })).toBeInTheDocument();
-    expect(screen.getByRole("figure")).toHaveTextContent("Started:");
+    const figures = screen.getAllByRole("figure");
+    expect(figures).toHaveLength(2);
+    expect(figures[0]).toHaveTextContent("cross-model-review");
+    expect(figures[1]).toHaveTextContent("Started:");
   });
 
   it("does not link to the projects page", () => {
