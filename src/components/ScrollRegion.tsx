@@ -8,10 +8,11 @@ import { cn } from "@/lib/utils";
  * and that fades its trailing edge while more content sits off to the right.
  * Children should size to their content (`w-max min-w-full`) so the fade and
  * background track the scrolled width rather than the viewport.
+ * `data-overflow` is absent until the first measurement, so tests can wait for it.
  */
 export function ScrollRegion({ label, children }: { label: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [overflow, setOverflow] = useState(false);
+  const [overflow, setOverflow] = useState<boolean | null>(null);
 
   const measure = useCallback(() => {
     const el = ref.current;
@@ -37,7 +38,7 @@ export function ScrollRegion({ label, children }: { label: string; children: Rea
         role="region"
         aria-label={label}
         tabIndex={0}
-        data-overflow={overflow}
+        data-overflow={overflow ?? undefined}
         onScroll={measure}
         className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
@@ -48,7 +49,7 @@ export function ScrollRegion({ label, children }: { label: string; children: Rea
         data-slot="scroll-fade"
         className={cn(
           "pointer-events-none absolute inset-y-px right-0 w-10 bg-linear-to-l from-muted to-transparent transition-opacity",
-          overflow ? "opacity-100" : "opacity-0",
+          overflow === true ? "opacity-100" : "opacity-0",
         )}
       />
     </div>

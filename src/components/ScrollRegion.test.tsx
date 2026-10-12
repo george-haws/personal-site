@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import { ScrollRegion } from "@/components/ScrollRegion";
 
@@ -24,6 +25,16 @@ describe("ScrollRegion", () => {
     const region = screen.getByRole("region", { name: "Sample output" });
     expect(region).toHaveAttribute("tabindex", "0");
     expect(region).toHaveTextContent("hello");
+  });
+
+  it("renders no data-overflow on the server, so clients can wait for a measurement", () => {
+    const html = renderToStaticMarkup(
+      <ScrollRegion label="Sample output">
+        <pre>hello</pre>
+      </ScrollRegion>,
+    );
+    expect(html).toContain('role="region"');
+    expect(html).not.toContain("data-overflow");
   });
 
   it("shows no fade when the content fits", () => {
