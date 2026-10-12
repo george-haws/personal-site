@@ -23,7 +23,10 @@ vendor replaceable without touching the site.
   script names; a same-origin request to an unremarkable path passes them.
   Alternatives considered: plain anchors for internal links (full reloads,
   no client code, but changes how the site navigates) and counting entry
-  pages only (loses the pages report).
+  pages only (loses the pages report). This is the heaviest of the three
+  for a site this size: a public endpoint, input validation, an existence
+  subrequest, and a client component, taken on to keep `next/link`
+  transitions. Recorded as a deliberate trade.
 - The Worker sends each pageview to a vendor's server-side events API. The
   first vendor is Umami Cloud's free Hobby plan (100k events a month, one
   site, six months of history). The vendor's dashboard is the only UI.
@@ -39,8 +42,9 @@ vendor replaceable without touching the site.
   parses them, so per-link and per-person attribution needs no custom code.
 - Invariant: analytics can never break the site. The asset response is
   obtained before any tracking code runs, every line of tracking code
-  (trackability check, record building, provider call) sits inside one
-  try/catch that logs and drops, and the response is returned unchanged
+  (provider construction, trackability check, record building, provider
+  call) sits inside a try/catch that logs and drops, background promises
+  carry their own catch, and the response is returned unchanged
   regardless.
 - Free Cloudflare Web Analytics was rejected because its beacon loads from a
   Cloudflare hostname on the standard block lists and it discards query
@@ -83,15 +87,23 @@ Findings this design rests on. Vendor terms change; these were current on
   client-side rendering of the tree above it; `usePathname` does not. The
   tracker uses only `usePathname` and reads the query string from
   `window.location` inside its effect.
+- Blocker lists were checked for the ping path on 2026-10-11. EasyPrivacy
+  has no rule for a bare `/pv` but several for `/pv?...` and `/pv.gif`,
+  so `pv` was dropped. `/nav` has zero matches in EasyPrivacy, uBlock's
+  privacy list, and uBlock's main filter list.
+- The WHATWG URL parser treats a backslash as a slash for `https`, so
+  `new URL("/\\evil.example/", origin)` resolves to another host. A path
+  check by string prefix is not enough; the ping URL is validated by
+  resolving it against the request origin and requiring the same origin.
 
 ## Request flow: document loads
 
 1. A request reaches the Worker when its path is not under `/_next/`. Next's
    chunks, fonts, and images stay on the asset-first path and never invoke
    the Worker.
-2. If the request is `POST /pv`, see the next section. Otherwise the Worker
-   fetches the asset through the `ASSETS` binding and keeps the response to
-   return unchanged.
+2. If the request is `POST /nav`, see the next section. Otherwise the
+   Worker fetches the asset through the `ASSETS` binding and keeps the
+   response to return unchanged.
 3. The request is trackable when all of these hold:
    - the method is GET;
    - the asset response status is 200 or 304;
@@ -101,7 +113,9 @@ Findings this design rests on. Vendor terms change; these were current on
    - no `Sec-Purpose` or `Purpose` header contains `prefetch` (Chrome
      prerender and search-engine prefetch send document requests nobody
      has looked at).
-4. A trackable request whose user agent the isbot library flags is dropped.
+4. A request with an empty or missing User-Agent, or one the isbot library
+   flags, is dropped. Umami rejects events without a user agent, so an
+   empty one would only produce an error log per scanner hit.
 5. Otherwise the Worker builds a pageview record, hands
    `provider.track(record)` to `ctx.waitUntil`, and returns the asset
    response. Tracking never delays or modifies the response.
@@ -118,7 +132,7 @@ guarantees.
 A client component `RouteTracker`, mounted once in the root layout, watches
 `usePathname()`. On the first render it only records the current pathname,
 because the Worker has already counted the document load. On each later
-change it POSTs to `/pv` on the site's own origin with `fetch` and
+change it POSTs to `/nav` on the site's own origin with `fetch` and
 `keepalive: true`:
 
 ```json
@@ -130,26 +144,29 @@ previous page's full URL, which is what Umami's own client sends and which
 Umami strips as a self-referral. Hash changes do not change the pathname and
 are not reported. Back and forward navigations are.
 
-The Worker handles `POST /pv`:
+The Worker handles `POST /nav`:
 
-1. Parse the JSON body. `url` must be a string starting with a single `/`
-   and at most 2000 characters; `referrer` is optional, a string of at most
-   2000 characters. Anything else is a 400.
+1. Parse the JSON body. `url` must be a string of at most 2000 characters
+   that starts with `/` and, resolved against the request's origin, stays
+   on that origin (this is what rejects `//host` and `/\host`); the
+   resolved path and query are what get recorded. `referrer` is optional,
+   a string of at most 2000 characters. Anything else is a 400.
 2. If a `Sec-Fetch-Site` header is present and is not `same-origin`, reply
    204 and do nothing. This is a tripwire against casual cross-site posts,
    not security; the endpoint is public and a determined spammer can fake
    pageviews. Accepted for a personal site.
-3. Confirm the page exists: a HEAD request for the pathname through the
-   `ASSETS` binding must return 200 or 304. Otherwise reply 204 and do
-   nothing, keeping the "no 404s" rule.
-4. Drop user agents isbot flags.
-5. Build the pageview record from the body's `url` and `referrer` and the
-   request's user agent, IP, and language headers, hand it to
-   `ctx.waitUntil`, and reply 204.
+3. Drop requests with an empty user agent or one isbot flags: reply 204.
+4. Build the pageview record from the body's `url` and `referrer` and the
+   request's user agent, IP, and language headers. Reply 204 at once, and
+   in `ctx.waitUntil`: confirm the page exists with a HEAD request through
+   the `ASSETS` binding (200 or 304, keeping the "no 404s" rule), then call
+   the provider. Nothing waits on the 204, so the existence check belongs
+   with the other background work.
 
-`/pv` is a short path chosen to look like nothing in particular; generic
-blocker rules match paths containing words like `track`, `collect`, or
-`analytics`. A GET to `/pv` falls through to the asset path and 404s.
+`/nav` was chosen by checking the blocker lists (see Research summary);
+generic rules match paths containing words like `track`, `collect`,
+`analytics`, and `pv`. A GET to `/nav` falls through to the asset path and
+404s.
 
 No CSP change: the policy sets `default-src 'self'` and no `connect-src`,
 so a same-origin fetch is already allowed.
@@ -166,7 +183,7 @@ type PageView = {
   referrer: string | null;   // Referer header or the ping's referrer, else null
   userAgent: string;
   ip: string;         // CF-Connecting-IP
-  language: string | null;   // first Accept-Language tag without its weight, else null
+  language: string | null;   // first Accept-Language tag without its weight, at most 35 chars, else null
 };
 ```
 
@@ -245,8 +262,8 @@ The Cloudflare git integration's build and deploy commands are unchanged.
 
 - `worker/index.ts`: the fetch handler. Exports `default { fetch }` and the
   pure helpers it uses so they can be unit tested: `isTrackable(request,
-  response)`, `pageViewFrom(request)`, `pageViewFromPing(request, body)`,
-  and `parsePing(body)`.
+  response)`, `pageViewFrom(request)`, `parsePing(body, origin)`, and
+  `pageViewFromPing(request, ping)`.
 - `worker/provider.ts`: the `PageView` and `Provider` types,
   `createProvider(env)`, and the no-op provider.
 - `worker/providers/umami.ts`: the Umami provider.
@@ -310,14 +327,16 @@ recording provider.
 - `isTrackable`: a document GET with a 200 asset is tracked, and with a 304;
   `/resume.pdf` is tracked; a request under `/_next/` is not (defensive,
   even though routing excludes it); a non-GET is not; a 404 asset is not; a
-  request whose user agent isbot flags is not; a document request with
-  `Sec-Purpose: prefetch` is not.
+  request whose user agent isbot flags is not; a request with no user
+  agent is not; a document request with `Sec-Purpose: prefetch` is not.
 - `pageViewFrom`: builds the record from a request carrying
   `CF-Connecting-IP`, `Referer`, `Accept-Language`, and a query string;
-  reduces `en-US,en;q=0.9,es;q=0.8` to `en-US`; yields null for absent
-  referrer and language.
-- `parsePing`: accepts a valid body; rejects a missing `url`, a `url` not
-  starting with `/`, a protocol-relative `//host`, and over-long values.
+  reduces `en-US,en;q=0.9,es;q=0.8` to `en-US`; caps the tag at 35
+  characters; yields null for absent referrer and language.
+- `parsePing`: accepts a valid body and returns the resolved path and
+  query; rejects a missing `url`, a `url` not starting with `/`, an
+  absolute URL, a protocol-relative `//host`, a backslash `/\host`, and
+  over-long values.
 - `pageViewFromPing`: combines the body's `url` and `referrer` with the
   request's headers into the same record shape.
 - `createProvider`: returns the Umami provider for `"umami"` and the no-op
@@ -328,12 +347,12 @@ recording provider.
 - Fetch handler: returns the asset response unchanged; passes a trackable
   request to the provider through `ctx.waitUntil`; does not call the
   provider for an untracked request; still returns the asset response when
-  `pageViewFrom` throws (the invariant); for `POST /pv` returns 204 and
-  tracks a valid ping, returns 400 for an invalid body, and returns 204
-  without tracking when the page HEAD is a 404, when `Sec-Fetch-Site` is
-  `cross-site`, or when the user agent is a bot.
+  the provider throws (the invariant); for `POST /nav` returns 204 and
+  tracks a valid ping after a HEAD for the page, returns 400 for an invalid
+  body, and returns 204 without tracking when the page HEAD is a 404, when
+  `Sec-Fetch-Site` is `cross-site`, or when the user agent is a bot.
 - `RouteTracker` (jsdom, `next/navigation` mocked): no request on mount; one
-  POST to `/pv` with the new `url` and the previous page as `referrer` when
+  POST to `/nav` with the new `url` and the previous page as `referrer` when
   the pathname changes; no request on a re-render with the same pathname.
 - `contactItems`: the site link's href carries the resume tag for each
   medium and the display text is unchanged.
@@ -346,8 +365,9 @@ recording provider.
    abroad, or compare Umami's country breakdown with the zone analytics map
    for a day. A visit that "shows a country" is not enough.
 2. Reload the page; the repeat visit (a 304) appears.
-3. Click through to a second page without reloading; it appears in the
-   pages list.
+3. With uBlock Origin enabled, click through to a second page without
+   reloading; it appears in the pages list and the `/nav` request is not
+   shown as blocked in the browser's network panel.
 4. Open the resume PDF; `/resume.pdf` appears in the pages list.
 5. Follow a tagged link; the campaign appears under UTM reporting.
 6. Compare Umami's visits with zone analytics unique visitors for the same
@@ -362,4 +382,4 @@ recording provider.
   file is written when a vendor is chosen.
 - Workers Analytics Engine, Counterscale, or any self-run dashboard.
 - Filtering by Cloudflare bot score, which is not available on the Free plan.
-- Abuse protection for `/pv` beyond the same-origin tripwire.
+- Abuse protection for `/nav` beyond the same-origin tripwire.
