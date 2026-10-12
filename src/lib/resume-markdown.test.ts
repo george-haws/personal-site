@@ -51,7 +51,7 @@ describe("renderResumeMarkdown", () => {
     expect(lines[0]).toBe("# Ada Lovelace");
     expect(lines[1]).toBe("**Staff Engineer**");
     expect(lines[2]).toBe(
-      "London · [ada@ada.dev](mailto:ada@ada.dev) · [ada.dev](https://ada.dev) · [github.com/ada](https://github.com/ada)",
+      "London · [ada@ada.dev](mailto:ada@ada.dev) · [ada.dev](https://ada.dev/?utm_source=resume&utm_medium=markdown) · [github.com/ada](https://github.com/ada)",
     );
   });
 
