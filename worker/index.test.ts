@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { firstLanguage, handleRequest, isTrackable, pageViewFrom } from "./index";
+import * as worker from "./index";
+import { firstLanguage, handleRequest, isTrackable, pageViewFrom, pageViewFromPing, parsePing } from "./index";
+import { PING_PATH } from "./ping-path";
 import type { Provider } from "./provider";
 
 const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
@@ -189,5 +191,167 @@ describe("handleRequest", () => {
 
     expect(response).toBe(assetResponse);
     expect(error).toHaveBeenCalledOnce();
+  });
+});
+
+function pingRequest(body: unknown, headers: Record<string, string> = {}) {
+  return new Request(`https://ghaws.dev${PING_PATH}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Sec-Fetch-Site": "same-origin",
+      "User-Agent": BROWSER,
+      "CF-Connecting-IP": "203.0.113.7",
+      ...headers,
+    },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+/** An ASSETS stub whose HEAD for `/missing` is a 404 and everything else a 200. */
+function stubEnvWithPages() {
+  const fetch = vi.fn(async (input: Request | string) => {
+    const request = input instanceof Request ? input : new Request(input);
+    const status = new URL(request.url).pathname === "/missing" ? 404 : 200;
+    return new Response(request.method === "HEAD" ? null : "<html></html>", { status });
+  });
+  return { ASSETS: { fetch } } as unknown as Env;
+}
+
+const ORIGIN = "https://ghaws.dev";
+
+describe("parsePing", () => {
+  it("accepts a path with an optional referrer and returns the resolved path and query", () => {
+    expect(parsePing({ url: "/writing?x=1", referrer: "https://ghaws.dev/" }, ORIGIN)).toEqual({
+      url: "/writing?x=1",
+      referrer: "https://ghaws.dev/",
+    });
+    expect(parsePing({ url: "/writing" }, ORIGIN)).toEqual({ url: "/writing", referrer: null });
+    expect(parsePing({ url: "/writing", referrer: "" }, ORIGIN)).toEqual({ url: "/writing", referrer: null });
+    expect(parsePing({ url: "/writing/../resume" }, ORIGIN)).toEqual({ url: "/resume", referrer: null });
+  });
+
+  it("rejects bodies that are not an object with a same-origin path", () => {
+    expect(parsePing(null, ORIGIN)).toBeNull();
+    expect(parsePing("/writing", ORIGIN)).toBeNull();
+    expect(parsePing({}, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "writing" }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "https://evil.example/" }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "//evil.example/" }, ORIGIN)).toBeNull();
+    // The WHATWG parser reads a backslash as a slash for https, so this is "//evil.example/" in disguise.
+    expect(parsePing({ url: "/\\evil.example/" }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: `/${"a".repeat(2000)}` }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "/writing", referrer: 42 }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "/writing", referrer: "h".repeat(2001) }, ORIGIN)).toBeNull();
+  });
+});
+
+describe("pageViewFromPing", () => {
+  it("combines the ping body with the request headers", () => {
+    const request = pingRequest({}, { "Accept-Language": "de-DE,de;q=0.9" });
+    expect(pageViewFromPing(request, { url: "/writing?x=1", referrer: "https://ghaws.dev/" })).toEqual({
+      url: "https://ghaws.dev/writing?x=1",
+      hostname: "ghaws.dev",
+      referrer: "https://ghaws.dev/",
+      userAgent: BROWSER,
+      ip: "203.0.113.7",
+      language: "de-DE",
+    });
+  });
+});
+
+describe("handleRequest for POST /nav", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns 204 at once, then confirms the page exists and tracks it in the background", async () => {
+    const env = stubEnvWithPages();
+    const { ctx, pending } = stubCtx();
+    const { provider, views } = recordingProvider();
+
+    const response = await handleRequest(
+      pingRequest({ url: "/writing", referrer: "https://ghaws.dev/" }),
+      env,
+      ctx,
+      provider,
+    );
+
+    expect(response.status).toBe(204);
+    expect(ctx.waitUntil).toHaveBeenCalledOnce();
+    await Promise.all(pending);
+    const headCall = (env.ASSETS.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as Request;
+    expect(headCall.method).toBe("HEAD");
+    expect(new URL(headCall.url).pathname).toBe("/writing");
+    expect(views).toEqual([
+      expect.objectContaining({ url: "https://ghaws.dev/writing", referrer: "https://ghaws.dev/" }),
+    ]);
+  });
+
+  it("returns 400 for an invalid body", async () => {
+    const env = stubEnvWithPages();
+    const { ctx } = stubCtx();
+    const { provider, views } = recordingProvider();
+
+    expect((await handleRequest(pingRequest("not json"), env, ctx, provider)).status).toBe(400);
+    expect((await handleRequest(pingRequest({ url: "nope" }), env, ctx, provider)).status).toBe(400);
+    expect((await handleRequest(pingRequest({ url: "/\\evil.example/" }), env, ctx, provider)).status).toBe(400);
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
+    expect(views).toEqual([]);
+  });
+
+  it("does not track a page that is not in the assets", async () => {
+    const env = stubEnvWithPages();
+    const { ctx, pending } = stubCtx();
+    const { provider, views } = recordingProvider();
+
+    const response = await handleRequest(pingRequest({ url: "/missing" }), env, ctx, provider);
+
+    expect(response.status).toBe(204);
+    await Promise.all(pending);
+    expect(views).toEqual([]);
+  });
+
+  it("returns 204 without any background work for a cross-site post or a bot", async () => {
+    const env = stubEnvWithPages();
+    const { ctx } = stubCtx();
+    const { provider, views } = recordingProvider();
+
+    const crossSite = await handleRequest(
+      pingRequest({ url: "/writing" }, { "Sec-Fetch-Site": "cross-site" }),
+      env,
+      ctx,
+      provider,
+    );
+    const bot = await handleRequest(
+      pingRequest({ url: "/writing" }, { "User-Agent": CRAWLER }),
+      env,
+      ctx,
+      provider,
+    );
+
+    expect([crossSite.status, bot.status]).toEqual([204, 204]);
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
+    expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+    expect(views).toEqual([]);
+  });
+
+  it("serves a GET to the ping path from the assets like any other path", async () => {
+    const { env, assetResponse } = stubEnv(404);
+    const { ctx } = stubCtx();
+    const { provider } = recordingProvider();
+
+    const response = await handleRequest(documentRequest(PING_PATH), env, ctx, provider);
+
+    expect(response).toBe(assetResponse);
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
+  });
+});
+
+describe("module exports", () => {
+  it("exports only functions besides the default handler, as workerd requires of the main module", () => {
+    for (const [name, value] of Object.entries(worker)) {
+      if (name !== "default") expect(typeof value, name).toBe("function");
+    }
   });
 });

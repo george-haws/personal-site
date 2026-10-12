@@ -1,5 +1,39 @@
 import { isbot } from "isbot";
+import { PING_PATH } from "./ping-path";
 import { createProvider, noopProvider, type PageView, type Provider } from "./provider";
+
+const MAX_PING_FIELD = 2000;
+
+/** A validated ping: `url` is the resolved site-relative path plus query. */
+export type Ping = { url: string; referrer: string | null };
+
+/** Validates a ping body against the request's origin; `referrer` is optional. */
+export function parsePing(body: unknown, origin: string): Ping | null {
+  if (typeof body !== "object" || body === null) return null;
+  const { url, referrer } = body as Record<string, unknown>;
+  if (typeof url !== "string" || url.length > MAX_PING_FIELD || !url.startsWith("/")) return null;
+  let resolved: URL;
+  try {
+    resolved = new URL(url, origin);
+  } catch {
+    return null;
+  }
+  // A prefix check is not enough: the URL parser reads "/\evil.example/" as another host.
+  if (resolved.origin !== origin) return null;
+  if (referrer !== undefined && referrer !== null) {
+    if (typeof referrer !== "string" || referrer.length > MAX_PING_FIELD) return null;
+  }
+  return {
+    url: resolved.pathname + resolved.search,
+    referrer: typeof referrer === "string" && referrer !== "" ? referrer : null,
+  };
+}
+
+/** The page view record for a client-side route change reported by the page. */
+export function pageViewFromPing(request: Request, ping: Ping): PageView {
+  const url = new URL(ping.url, new URL(request.url).origin);
+  return { ...pageViewFrom(request), url: url.href, referrer: ping.referrer };
+}
 
 /** Umami's own client sends navigator.language; its session column is this wide. */
 const MAX_LANGUAGE = 35;
@@ -56,6 +90,57 @@ export function pageViewFrom(request: Request): PageView {
   };
 }
 
+function noContent(): Response {
+  return new Response(null, { status: 204 });
+}
+
+function badRequest(): Response {
+  return new Response("Bad Request", { status: 400 });
+}
+
+/**
+ * POST /nav from RouteTracker. The endpoint is public; the same-origin check is
+ * a tripwire against casual cross-site posts, not security. Nothing waits on
+ * the 204, so the existence check runs with the tracking in the background.
+ */
+async function handlePing(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  provider: Provider,
+): Promise<Response> {
+  try {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return badRequest();
+    }
+    const ping = parsePing(body, new URL(request.url).origin);
+    if (ping === null) return badRequest();
+
+    const site = request.headers.get("Sec-Fetch-Site");
+    if (site !== null && site !== "same-origin") return noContent();
+    if (isBot(request)) return noContent();
+
+    const view = pageViewFromPing(request, ping);
+    ctx.waitUntil(
+      (async () => {
+        // Keep the "no 404s" rule: the page has to exist in the assets.
+        const head = await env.ASSETS.fetch(new Request(view.url, { method: "HEAD" }));
+        if (head.status === 200 || head.status === 304) await provider.track(view);
+      })().catch(logPingError),
+    );
+  } catch (error) {
+    logPingError(error);
+  }
+  return noContent();
+}
+
+function logPingError(error: unknown) {
+  console.error("analytics: ping failed", error);
+}
+
 /**
  * Serves the asset exactly as before, then reports the view in the background.
  * Invariant: nothing in here can change or delay the response. All tracking
@@ -67,6 +152,9 @@ export async function handleRequest(
   ctx: ExecutionContext,
   provider: Provider,
 ): Promise<Response> {
+  if (request.method === "POST" && new URL(request.url).pathname === PING_PATH) {
+    return handlePing(request, env, ctx, provider);
+  }
   const response = await env.ASSETS.fetch(request);
   try {
     if (isTrackable(request, response)) {
