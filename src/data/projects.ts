@@ -2,6 +2,46 @@ import type { Project } from "@/lib/types";
 
 export const projects: Project[] = [
   {
+    title: "expo-whisperkit",
+    summary:
+      "On-device speech to text for Expo apps on iOS. Models download on demand, transcription runs offline, and every failure carries a typed code.",
+    description:
+      "An Expo module around Argmax's WhisperKit. The config plugin adds two pods that build WhisperKit from source, so apps need no CocoaPods plugin or Ruby gem. The API covers push-to-talk, file transcription, and streaming with partial results. A manifest pins each model to a repo commit and per-file hash, and every download is verified before it counts as present, so an upstream change fails loudly instead of silently changing what the app runs. Phone calls, Siri, and backgrounding end capture without an error and keep the audio for the next stop.",
+    tech: ["TypeScript", "Swift", "Expo Modules", "WhisperKit", "CoreML", "Maestro"],
+    repoUrl: "https://github.com/george-haws/expo-whisperkit",
+    demo: [
+      [
+        { text: "downloadProgress", style: "label" },
+        { text: "   { model: 'base', fraction: 0.42 }", style: "dim" },
+      ],
+      [
+        { text: "modelState", style: "label" },
+        { text: "         { model: 'base', state: 'loaded' }", style: "dim" },
+      ],
+      [
+        { text: "streamingUpdate", style: "label" },
+        { text: "    confirmed: " },
+        { text: "\"Add tahini and\"", style: "name" },
+        { text: "   pending: " },
+        { text: "\"za'atar to the\"", style: "italic" },
+      ],
+      [
+        { text: "streamingUpdate", style: "label" },
+        { text: "    confirmed: " },
+        { text: "\"Add tahini and za'atar to the\"", style: "name" },
+        { text: "   pending: " },
+        { text: "\"list\"", style: "italic" },
+      ],
+      [
+        { text: "stopStreaming", style: "label" },
+        { text: "  →   { text: " },
+        { text: "\"Add tahini and za'atar to the list\"", style: "name" },
+        { text: ", language: 'en' }" },
+      ],
+    ],
+    featured: true,
+  },
+  {
     title: "Claude Code setup",
     summary:
       "A versioned Claude Code config: a hook that catches every spec and plan, and a second model that reviews them before I do.",
