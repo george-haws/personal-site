@@ -33,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </header>
             <main className="flex-1 py-10">{children}</main>
             <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border py-6 text-sm text-muted-foreground">
-              <small>
+              <small className="text-sm">
                 © {new Date().getFullYear()} {site.name}
               </small>
               <SocialLinks links={site.links} />
