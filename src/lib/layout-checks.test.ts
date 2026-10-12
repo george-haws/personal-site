@@ -76,6 +76,14 @@ describe("overflowingElements", () => {
     ]);
     expect(overflowingElements(f)).toEqual([]);
   });
+
+  it("measures against the device width even when a mobile layout viewport has grown", () => {
+    const f = { ...facts([
+      element({ index: 0, rect: { left: 0, top: 0, width: 328, height: 10 } }),
+      element({ index: 1, rect: { left: 300, top: 0, width: 20, height: 10 } }),
+    ]), innerWidth: 328, scrollWidth: 328, clientWidth: 320 };
+    expect(overflowingElements(f).map((e) => e.index)).toEqual([0]);
+  });
 });
 
 describe("smallTargets", () => {

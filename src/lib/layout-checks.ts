@@ -133,13 +133,19 @@ export function collectLayoutFacts(): LayoutFacts {
   };
 }
 
-/** Rendered, uncontained elements past either viewport edge. */
+/**
+ * Rendered, uncontained elements past either edge of the device width.
+ * Compares against clientWidth, not innerWidth: with isMobile, Chrome grows the
+ * layout viewport (innerWidth) to fit overflowing content, which would hide
+ * exactly the overflow this check exists to catch. documentElement.clientWidth
+ * stays at the device width.
+ */
 export function overflowingElements(facts: LayoutFacts): ElementFact[] {
   return facts.elements.filter(
     (e) =>
       e.rendered &&
       e.containedBy === null &&
-      (e.rect.right > facts.innerWidth + 1 || e.rect.left < -1),
+      (e.rect.right > facts.clientWidth + 1 || e.rect.left < -1),
   );
 }
 
