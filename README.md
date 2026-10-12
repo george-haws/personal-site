@@ -25,10 +25,45 @@ Tailwind v4 with shadcn primitives; theme tokens live in `src/app/globals.css` a
 ## Local development
 
     npm install
-    npm run dev        # http://localhost:3000
+    npm run dev        # http://localhost:3000, no analytics
+    npm run preview    # the static export behind the Worker, analytics off
     npm run check      # typecheck + lint + tests
     npm run build      # static export to out/
     npm run resume     # regenerate the resume Markdown and PDF
+    npm run types      # regenerate worker/worker-configuration.d.ts after changing wrangler.jsonc
+
+## Analytics
+
+Page views are recorded at the edge, not by a third-party script. The Worker in `worker/` runs in front of the static assets for pages and the PDF, serves the asset unchanged, and then reports document loads (and `/resume.pdf`) to an analytics provider in the background. Internal links navigate client-side, so `RouteTracker` in the layout POSTs each route change to the Worker at `/nav` on the site's own origin. Nothing loads from a third-party host and the path matches no rule in EasyPrivacy or uBlock's lists, so ad blockers have nothing to block. The provider is one function behind `createProvider` in `worker/provider.ts`; the first is Umami Cloud's free plan.
+
+Only pages and the PDF run the Worker; Next's chunks, RSC payloads, icons, and crawler files stay asset-first and do not count against the Workers Free daily limit. If the site ever exceeds that limit, pages return a Cloudflare 1027 error until the day resets; the Workers Paid plan removes the cap.
+
+One-time setup:
+
+1. Create a free account at umami.is, add a website for `ghaws.dev`, and copy its website ID.
+2. Paste the ID into `UMAMI_WEBSITE_ID` in `wrangler.jsonc`. With it empty, the Worker serves the site and tracks nothing.
+3. The default endpoint is `https://gateway.umami.is/api/send`, the host Umami's sending-stats docs give for Cloud. The dashboard's tracking snippet loads its script from `cloud.umami.is`. If events do not arrive after the next step, add `UMAMI_ENDPOINT` to `vars` in `wrangler.jsonc` with the value `https://cloud.umami.is/api/send`.
+4. Push to `main`. Then verify: visit the site with and without an ad blocker and confirm both show in Umami with the correct country (check from a phone on cellular or a VPN exit abroad; a visit that merely shows some country could be the Worker's own address). Reload once and confirm the repeat shows. With uBlock Origin enabled, click to a second page without reloading and confirm it appears and the `/nav` request is not blocked. Open the PDF and confirm `/resume.pdf` appears. Branch previews and the workers.dev hostname deploy with the same vars, so your own preview visits land in Umami under their hostname; filter by hostname in the dashboard.
+
+If visits show the wrong country, Umami is ignoring the `ip` payload field. In `worker/providers/umami.ts`, add an `x-umami-client-ip` header set to `view.ip`; Umami Cloud reads that header before any other IP header.
+
+### Tagging links
+
+Every link you place carries standard UTM parameters, so the dashboard shows which link brought a visitor. Untagged visits still show the referrer, but LinkedIn's mobile app often sends none, and the referrer never says which post or message.
+
+| Parameter | Meaning | Values |
+|---|---|---|
+| `utm_source` | where the link lives | `linkedin`, `github`, `email`, `resume` |
+| `utm_medium` | kind of placement | `profile`, `post`, `message`, `pdf`, `markdown` |
+| `utm_campaign` | the specific link, and the per-person slot | a post slug, or company and role such as `acme-staff-eng` |
+
+A link sent to one recruiter: `https://ghaws.dev/?utm_source=linkedin&utm_medium=message&utm_campaign=acme-staff-eng`
+
+The resume exports already tag their site link with `utm_source=resume`. Update the website field on your LinkedIn and GitHub profiles once with `utm_source=linkedin&utm_medium=profile` and `utm_source=github&utm_medium=profile`.
+
+### Swapping providers
+
+Add a file under `worker/providers/` exporting a function that returns `{ track(view) }` for the `PageView` type in `worker/provider.ts`, add a case for it in `createProvider`, add any config it needs to `vars` in `wrangler.jsonc`, run `npm run types`, and set `ANALYTICS_PROVIDER` to its name. Providers must never throw: log and resolve. Plausible's events API takes the IP in an `X-Forwarded-For` header and the user agent in `User-Agent`; Pirsch is server-side by design. Both fit the same shape.
 
 ## Browser tests
 

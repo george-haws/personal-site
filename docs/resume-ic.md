@@ -2,7 +2,7 @@
 
 **Staff Software Engineer**
 
-Long Beach, CA · [me@ghaws.dev](mailto:me@ghaws.dev) · [ghaws.dev](https://ghaws.dev) · [github.com/george-haws](https://github.com/george-haws) · [linkedin.com/in/gehaws](https://www.linkedin.com/in/gehaws)
+Long Beach, CA · [me@ghaws.dev](mailto:me@ghaws.dev) · [ghaws.dev](https://ghaws.dev/?utm_source=resume&utm_medium=markdown) · [github.com/george-haws](https://github.com/george-haws) · [linkedin.com/in/gehaws](https://www.linkedin.com/in/gehaws)
 
 ## Summary
 

@@ -54,7 +54,7 @@ function renderEntry(entry: Experience): string {
 
 /** A standalone HTML document for printing the resume to PDF. */
 export function renderResumeHtml(resume: Resume, site: SiteInfo): string {
-  const contact = contactItems(site)
+  const contact = contactItems(site, "pdf")
     .map((item) =>
       item.href
         ? `<a href="${escapeHtml(item.href)}">${escapeHtml(item.text)}</a>`

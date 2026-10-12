@@ -96,7 +96,7 @@ describe("renderResumeHtml", () => {
     const hrefs = Array.from(doc.querySelectorAll("a")).map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual([
       "mailto:ada@ada.dev",
-      "https://ada.dev",
+      "https://ada.dev/?utm_source=resume&utm_medium=pdf",
       "https://github.com/ada",
       "https://www.linkedin.com/in/ada",
     ]);

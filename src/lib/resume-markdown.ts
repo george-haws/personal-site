@@ -5,7 +5,7 @@ import type { Resume, SiteInfo } from "@/lib/types";
 
 /** The complete Markdown resume, blocks separated by one blank line, ending in a single newline. */
 export function renderResumeMarkdown(resume: Resume, site: SiteInfo): string {
-  const contact = contactItems(site)
+  const contact = contactItems(site, "markdown")
     .map((item) => (item.href ? `[${item.text}](${item.href})` : item.text))
     .join(" · ");
 

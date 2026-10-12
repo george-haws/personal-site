@@ -49,6 +49,10 @@ vendor replaceable without touching the site.
 - Free Cloudflare Web Analytics was rejected because its beacon loads from a
   Cloudflare hostname on the standard block lists and it discards query
   strings, so tagged links would not register.
+- Residual risk accepted: a flood of page requests past the Free plan's
+  daily limit would return 1027s for pages until the day resets. The
+  routing exclusions keep ordinary traffic far below it; the Workers Paid
+  plan removes the cap.
 
 ## Research summary
 
@@ -78,11 +82,15 @@ Findings this design rests on. Vendor terms change; these were current on
   and the user agent in the User-Agent header and extracts UTM parameters
   from the `url` field. Pirsch is server-side by design. Both fit the same
   provider interface.
-- Workers Free allows 100k requests a day. Every request not under `/_next/`
-  invokes the Worker: page loads, the PDF, icons, robots and sitemap, the
-  `.txt` RSC payloads that `next/link` prefetches, and the pings. A visit
-  that reads three pages costs on the order of ten Worker requests. At the
-  site's traffic this is far below the limit, but it is not "one per page".
+- Every worker-first request counts against the Workers Free plan's 100k
+  requests a day. Past the limit, requests that invoke the Worker fail with
+  error 1027, while asset-first requests keep serving. Hence pages and the
+  PDF are worker-first and everything else (`/_next/`, the `.txt` RSC
+  payloads that `next/link` prefetches, icons, robots and sitemap) is
+  excluded; the exclusions were checked under `wrangler dev` and match
+  nested paths such as `/writing/<slug>.txt`. A visit that reads three pages
+  now costs about three Worker requests (the document load, then one ping
+  per client-side route change). The escape hatch is the Workers Paid plan.
 - `useSearchParams` in a static export forces a Suspense boundary and
   client-side rendering of the tree above it; `usePathname` does not. The
   tracker uses only `usePathname` and reads the query string from
@@ -98,9 +106,10 @@ Findings this design rests on. Vendor terms change; these were current on
 
 ## Request flow: document loads
 
-1. A request reaches the Worker when its path is not under `/_next/`. Next's
-   chunks, fonts, and images stay on the asset-first path and never invoke
-   the Worker.
+1. A request reaches the Worker when its path is not under `/_next/` and
+   does not end in `.txt`, `.ico`, `.png`, `.svg`, or `.xml`. Next's chunks,
+   fonts, RSC payloads, icons, and crawler files stay on the asset-first
+   path and never invoke the Worker.
 2. If the request is `POST /nav`, see the next section. Otherwise the
    Worker fetches the asset through the `ASSETS` binding and keeps the
    response to return unchanged.
@@ -195,8 +204,10 @@ type Provider = { track(view: PageView): Promise<void> };
 
 Providers never throw. Each wraps its network call, logs failures with
 `console.error`, and resolves. A factory `createProvider(env)` reads
-`env.ANALYTICS_PROVIDER` and returns the matching provider; `none`, unset,
-or an unknown value returns a no-op provider and logs a warning once.
+`env.ANALYTICS_PROVIDER` and returns the matching provider. `none` and
+unset return the no-op provider silently (preview passes `none` on
+purpose); an unknown value, or `umami` with an empty website ID, returns the
+no-op provider and logs a warning once.
 
 ## Umami provider
 
@@ -244,7 +255,7 @@ variable either way.
 
 - `main: "worker/index.ts"`
 - `assets.binding: "ASSETS"`
-- `assets.run_worker_first: ["/*", "!/_next/*"]`
+- `assets.run_worker_first: ["/*", "!/_next/*", "!/*.txt", "!/*.ico", "!/*.png", "!/*.svg", "!/*.xml"]`
 - `vars.ANALYTICS_PROVIDER: "umami"`
 - `vars.UMAMI_WEBSITE_ID: "<id from the Umami dashboard>"`
 
