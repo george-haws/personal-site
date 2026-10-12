@@ -1,9 +1,18 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "personal-site",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./out",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    "binding": "ASSETS",
+    // Next's build output stays asset-first; every other path runs the Worker.
+    "run_worker_first": ["/*", "!/_next/*"]
+  },
+  "vars": {
+    // "umami" or "none". The Worker disables tracking when the website ID is empty.
+    "ANALYTICS_PROVIDER": "umami",
+    "UMAMI_WEBSITE_ID": ""
   }
 }
