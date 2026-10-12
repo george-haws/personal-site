@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "deploy": "npm run check && npm run build && wrangler deploy",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "deploy": "npm run check && npm run test:e2e && wrangler deploy",
     "resume": "tsx scripts/build-resume.ts",
     "audit:responsive": "tsx scripts/audit-responsive.ts"
   },
