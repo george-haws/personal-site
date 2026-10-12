@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // wrangler dev writes temporary bundles here.
     ".wrangler/**",
+    // Claude Code keeps worktrees (with their own .next output) here.
+    ".claude/**",
   ]),
 ]);
 
