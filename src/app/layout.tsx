@@ -5,6 +5,7 @@ import { Nav } from "@/components/Nav";
 import { SocialLinks } from "@/components/SocialLinks";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { RouteTracker } from "@/components/RouteTracker";
 import { site } from "@/data/site";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={cn("font-sans", mono.variable)} suppressHydrationWarning>
       <body className="min-h-screen bg-background text-foreground antialiased">
+        <RouteTracker />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-6">
             <header className="flex items-center justify-between border-b border-border py-4">
