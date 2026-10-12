@@ -4,7 +4,7 @@
 
 **Goal:** Record every page view of ghaws.dev at the Cloudflare edge and send it to a swappable analytics provider, starting with Umami Cloud, so visits survive ad blockers and tagged links identify where a visitor came from.
 
-**Architecture:** A Cloudflare Worker runs in front of the static assets for every path outside `/_next/`. It serves the asset unchanged, then reports document loads (and the resume PDF) to a provider in the background. A small client component reports client-side route changes to the same Worker through a same-origin POST to `/pv`. The provider is one function behind a factory keyed by a config variable; the first implementation posts to Umami Cloud's events API.
+**Architecture:** A Cloudflare Worker runs in front of the static assets for every path outside `/_next/`. It serves the asset unchanged, then reports document loads (and the resume PDF) to a provider in the background. A small client component reports client-side route changes to the same Worker through a same-origin POST to `/nav`. The provider is one function behind a factory keyed by a config variable; the first implementation posts to Umami Cloud's events API.
 
 **Tech Stack:** Cloudflare Workers with static assets (wrangler 4.149), TypeScript, Next.js 16.4 App Router static export, React 19, vitest 5 with Testing Library, isbot 5.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Node 24 (`.nvmrc`). If `node` fails with a `dyld ... libicui18n` error, the Homebrew node on the PATH is broken; run `source ~/.nvm/nvm.sh && nvm use` first in that shell.
-- Invariant: analytics can never break the site. The asset response is obtained before tracking code runs; every line of tracking code sits inside a try/catch that logs with `console.error` and drops; the response is returned unchanged.
+- Invariant: analytics can never break the site. The asset response is obtained before tracking code runs; every line of tracking code, including provider construction, sits inside a try/catch that logs with `console.error` and drops; background promises carry their own `.catch`; the response is returned unchanged.
 - Providers never throw. They log with `console.error` and resolve.
 - Worker code under `worker/` never imports from `src/`, and `src/` never imports from `worker/`.
 - The CSP in `public/_headers` is not changed.
@@ -25,12 +25,12 @@
     referrer: string | null;
     userAgent: string;
     ip: string;                // CF-Connecting-IP
-    language: string | null;   // first Accept-Language tag without its weight
+    language: string | null;   // first Accept-Language tag without its weight, at most 35 chars
   };
   ```
 - Config variables in `wrangler.jsonc`: `ANALYTICS_PROVIDER` (`"umami"` or `"none"`), `UMAMI_WEBSITE_ID`, optional `UMAMI_ENDPOINT` (default `https://gateway.umami.is/api/send`).
-- Routing: `run_worker_first: ["/*", "!/_next/*"]`. Ping path: `/pv`.
-- Trackable document load: GET; asset status 200 or 304; `Sec-Fetch-Dest: document` (or, when that header is absent, `Accept` includes `text/html`) or path `/resume.pdf`; no `Sec-Purpose`/`Purpose` header containing `prefetch`; user agent not flagged by isbot. Paths under `/_next/` are never tracked.
+- Routing: `run_worker_first: ["/*", "!/_next/*"]`. Ping path: `/nav` (checked against EasyPrivacy and uBlock's lists on 2026-10-11: zero matches; `pv` was rejected because EasyPrivacy has `/pv?` and `/pv.gif` rules).
+- Trackable document load: GET; asset status 200 or 304; `Sec-Fetch-Dest: document` (or, when that header is absent, `Accept` includes `text/html`) or path `/resume.pdf`; no `Sec-Purpose`/`Purpose` header containing `prefetch`; user agent present, non-empty, and not flagged by isbot. Paths under `/_next/` are never tracked.
 - Commit messages follow the repo style: an imperative sentence as subject, a short body, ending with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 - `npm run check` (typecheck, lint, tests) must pass at the end of every task.
 - Before editing anything under `src/`, read the relevant Next.js guide in `node_modules/next/dist/docs/` (named per task); this Next version differs from training data.
@@ -47,7 +47,7 @@
 | `worker/provider.ts` | `PageView` and `Provider` types, `createProvider(env)`, no-op provider |
 | `worker/providers/umami.ts` | Umami provider: builds and sends the Umami payload |
 | `worker/index.ts` | Fetch handler: asset passthrough, trackability rules, record building, ping endpoint |
-| `src/components/RouteTracker.tsx` | Client component that POSTs client-side route changes to `/pv` |
+| `src/components/RouteTracker.tsx` | Client component that POSTs client-side route changes to `/nav` |
 | `src/app/layout.tsx` | Mounts `RouteTracker` |
 | `src/lib/resume-contact.ts` | Resume contact line; site link carries the resume UTM tag |
 | `README.md` | Analytics section: how it works, Umami setup, tagging convention, swapping providers |
@@ -77,28 +77,27 @@ Expected: `package.json` dependencies gain `"isbot": "^5.x"`.
 
 - [ ] **Step 2: Configure wrangler**
 
-Replace `wrangler.jsonc` with:
+Edit `wrangler.jsonc` in place. Do not change `name`, `compatibility_date`, `assets.directory`, `assets.not_found_handling`, or anything else already there: a changed `name` would deploy a second Worker and leave the custom domain on the old one. Add `main` after `name`, add `binding` and `run_worker_first` inside `assets`, and add `vars`:
 
 ```jsonc
-{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "personal-site",
   "main": "worker/index.ts",
-  "compatibility_date": "2026-09-01",
-  "assets": {
-    "directory": "./out",
+```
+
+```jsonc
     "binding": "ASSETS",
-    "not_found_handling": "404-page",
     // Next's build output stays asset-first; every other path runs the Worker.
     "run_worker_first": ["/*", "!/_next/*"]
-  },
+```
+
+```jsonc
   "vars": {
     // "umami" or "none". The Worker disables tracking when the website ID is empty.
     "ANALYTICS_PROVIDER": "umami",
     "UMAMI_WEBSITE_ID": ""
   }
-}
 ```
+
+After the edit, `git diff wrangler.jsonc` shows only added lines (plus a trailing comma on the line before each addition).
 
 - [ ] **Step 3: Create the placeholder Worker entry**
 
@@ -127,7 +126,8 @@ Create `worker/tsconfig.json`:
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "types": []
   },
   "include": ["./**/*.ts"]
 }
@@ -139,7 +139,7 @@ In `tsconfig.json`, change the exclude line to:
   "exclude": ["node_modules", "worker"]
 ```
 
-Why: `wrangler types` emits Workers runtime globals (`Request`, `Response`, `Fetcher`, …) that clash with the root config's `"lib": ["dom"]`. The Worker gets its own config without DOM.
+Why: `wrangler types` emits Workers runtime globals (`Request`, `Response`, `Fetcher`, …) that clash with the root config's `"lib": ["dom"]`, so the Worker gets its own config without DOM. `"types": []` stops `@types/node` (installed at the root) from being auto-included, since its `fetch`/`Request` globals clash with the Workers ones too. Vitest's types arrive through the `import ... from "vitest"` in each test file, so nothing is lost.
 
 - [ ] **Step 5: Add scripts and generate the types**
 
@@ -152,6 +152,9 @@ In `package.json` scripts, change `typecheck` and add `types`:
 
 Run: `npm run types`
 Expected: `worker/worker-configuration.d.ts` is created and contains `interface Env` with `ASSETS: Fetcher;`, `ANALYTICS_PROVIDER: string;`, `UMAMI_WEBSITE_ID: string;`. (`--strict-vars=false` keeps the vars typed as `string` rather than the literal `"umami"`, so comparing against `"none"` compiles.)
+
+Then run: `npx tsc -p worker`
+Expected: no output. If it reports duplicate identifiers for `Request`, `Response`, `Headers`, or `fetch`, a second set of globals is leaking in; confirm `"types": []` is in `worker/tsconfig.json` and that no `.d.ts` other than the generated one is under `worker/`.
 
 - [ ] **Step 6: Keep the generated file out of lint, and add Worker tests to vitest**
 
@@ -596,6 +599,10 @@ describe("firstLanguage", () => {
     expect(firstLanguage("fr;q=0.8")).toBe("fr");
   });
 
+  it("caps an oversized tag at 35 characters", () => {
+    expect(firstLanguage("x".repeat(60))).toBe("x".repeat(35));
+  });
+
   it("returns null for a missing or empty header", () => {
     expect(firstLanguage(null)).toBeNull();
     expect(firstLanguage("")).toBeNull();
@@ -650,8 +657,10 @@ describe("isTrackable", () => {
     expect(isTrackable(documentRequest("/", { headers: { Purpose: "prefetch" } }), ok)).toBe(false);
   });
 
-  it("does not track bots", () => {
+  it("does not track bots or requests without a user agent", () => {
     expect(isTrackable(documentRequest("/", { headers: { "User-Agent": CRAWLER } }), ok)).toBe(false);
+    const anonymous = new Request("https://ghaws.dev/", { headers: { "Sec-Fetch-Dest": "document" } });
+    expect(isTrackable(anonymous, ok)).toBe(false);
   });
 });
 
@@ -743,13 +752,16 @@ Replace `worker/index.ts` with:
 
 ```ts
 import { isbot } from "isbot";
-import { createProvider, type PageView, type Provider } from "./provider";
+import { createProvider, noopProvider, type PageView, type Provider } from "./provider";
+
+/** Umami's own client sends navigator.language; its session column is this wide. */
+const MAX_LANGUAGE = 35;
 
 /** First Accept-Language tag without its weight: "en-US,en;q=0.9" → "en-US". */
 export function firstLanguage(header: string | null): string | null {
   if (!header) return null;
   const first = header.split(",")[0]?.split(";")[0]?.trim();
-  return first ? first : null;
+  return first ? first.slice(0, MAX_LANGUAGE) : null;
 }
 
 function isDocumentRequest(request: Request): boolean {
@@ -766,8 +778,10 @@ function isPrefetch(request: Request): boolean {
   );
 }
 
+/** Crawlers, and anything with no user agent at all: Umami rejects events without one. */
 function isBot(request: Request): boolean {
-  return isbot(request.headers.get("User-Agent") ?? "");
+  const userAgent = request.headers.get("User-Agent");
+  return !userAgent || isbot(userAgent);
 }
 
 /** Whether a request that was served from the assets should count as a page view. */
@@ -809,17 +823,28 @@ export async function handleRequest(
   const response = await env.ASSETS.fetch(request);
   try {
     if (isTrackable(request, response)) {
-      ctx.waitUntil(provider.track(pageViewFrom(request)));
+      ctx.waitUntil(provider.track(pageViewFrom(request)).catch(logTrackingError));
     }
   } catch (error) {
-    console.error("analytics: tracking failed", error);
+    logTrackingError(error);
   }
   return response;
 }
 
+function logTrackingError(error: unknown) {
+  console.error("analytics: tracking failed", error);
+}
+
 export default {
   async fetch(request, env, ctx) {
-    return handleRequest(request, env, ctx, createProvider(env));
+    // Provider construction is tracking code too, so it gets the same guard.
+    let provider: Provider = noopProvider;
+    try {
+      provider = createProvider(env);
+    } catch (error) {
+      console.error("analytics: provider setup failed", error);
+    }
+    return handleRequest(request, env, ctx, provider);
   },
 } satisfies ExportedHandler<Env>;
 ```
@@ -827,7 +852,7 @@ export default {
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run worker/index.test.ts`
-Expected: PASS, 14 tests.
+Expected: PASS, 16 tests.
 
 - [ ] **Step 5: Run the full check and commit**
 
@@ -840,9 +865,9 @@ git commit -m "Track document loads at the edge
 
 Serve the asset first, then report GET document navigations and the
 resume PDF that were served with 200 or 304, skipping Next build
-output, prefetch and prerender requests, and bot user agents. Tracking
-runs after the response inside a try/catch so it can never break the
-site.
+output, prefetch and prerender requests, and bot or missing user
+agents. Tracking runs after the response inside a try/catch so it can
+never break the site.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
@@ -857,7 +882,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: everything from Task 3.
-- Produces: `PING_PATH = "/pv"`, `type Ping = { url: string; referrer: string | null }`, `parsePing(body: unknown): Ping | null`, `pageViewFromPing(request: Request, ping: Ping): PageView`. `handleRequest` now answers `POST /pv`. Task 5's client component posts `{ url, referrer }` JSON to `PING_PATH`.
+- Produces: `PING_PATH = "/nav"`, `type Ping = { url: string; referrer: string | null }` where `url` is the resolved site-relative path plus query, `parsePing(body: unknown, origin: string): Ping | null`, `pageViewFromPing(request: Request, ping: Ping): PageView`. `handleRequest` now answers `POST /nav`. Task 5's client component posts `{ url, referrer }` JSON to `PING_PATH`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -888,26 +913,31 @@ function stubEnvWithPages() {
   return { ASSETS: { fetch } } as unknown as Env;
 }
 
+const ORIGIN = "https://ghaws.dev";
+
 describe("parsePing", () => {
-  it("accepts a path with an optional referrer", () => {
-    expect(parsePing({ url: "/writing?x=1", referrer: "https://ghaws.dev/" })).toEqual({
+  it("accepts a path with an optional referrer and returns the resolved path and query", () => {
+    expect(parsePing({ url: "/writing?x=1", referrer: "https://ghaws.dev/" }, ORIGIN)).toEqual({
       url: "/writing?x=1",
       referrer: "https://ghaws.dev/",
     });
-    expect(parsePing({ url: "/writing" })).toEqual({ url: "/writing", referrer: null });
-    expect(parsePing({ url: "/writing", referrer: "" })).toEqual({ url: "/writing", referrer: null });
+    expect(parsePing({ url: "/writing" }, ORIGIN)).toEqual({ url: "/writing", referrer: null });
+    expect(parsePing({ url: "/writing", referrer: "" }, ORIGIN)).toEqual({ url: "/writing", referrer: null });
+    expect(parsePing({ url: "/writing/../resume" }, ORIGIN)).toEqual({ url: "/resume", referrer: null });
   });
 
-  it("rejects bodies that are not an object with a site-relative url", () => {
-    expect(parsePing(null)).toBeNull();
-    expect(parsePing("/writing")).toBeNull();
-    expect(parsePing({})).toBeNull();
-    expect(parsePing({ url: "writing" })).toBeNull();
-    expect(parsePing({ url: "https://evil.example/" })).toBeNull();
-    expect(parsePing({ url: "//evil.example/" })).toBeNull();
-    expect(parsePing({ url: `/${"a".repeat(2000)}` })).toBeNull();
-    expect(parsePing({ url: "/writing", referrer: 42 })).toBeNull();
-    expect(parsePing({ url: "/writing", referrer: "h".repeat(2001) })).toBeNull();
+  it("rejects bodies that are not an object with a same-origin path", () => {
+    expect(parsePing(null, ORIGIN)).toBeNull();
+    expect(parsePing("/writing", ORIGIN)).toBeNull();
+    expect(parsePing({}, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "writing" }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "https://evil.example/" }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "//evil.example/" }, ORIGIN)).toBeNull();
+    // The WHATWG parser reads a backslash as a slash for https, so this is "//evil.example/" in disguise.
+    expect(parsePing({ url: "/\\evil.example/" }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: `/${"a".repeat(2000)}` }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "/writing", referrer: 42 }, ORIGIN)).toBeNull();
+    expect(parsePing({ url: "/writing", referrer: "h".repeat(2001) }, ORIGIN)).toBeNull();
   });
 });
 
@@ -925,12 +955,12 @@ describe("pageViewFromPing", () => {
   });
 });
 
-describe("handleRequest for POST /pv", () => {
+describe("handleRequest for POST /nav", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("returns 204 and tracks a valid ping after confirming the page exists", async () => {
+  it("returns 204 at once, then confirms the page exists and tracks it in the background", async () => {
     const env = stubEnvWithPages();
     const { ctx, pending } = stubCtx();
     const { provider, views } = recordingProvider();
@@ -943,10 +973,11 @@ describe("handleRequest for POST /pv", () => {
     );
 
     expect(response.status).toBe(204);
+    expect(ctx.waitUntil).toHaveBeenCalledOnce();
+    await Promise.all(pending);
     const headCall = (env.ASSETS.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as Request;
     expect(headCall.method).toBe("HEAD");
     expect(new URL(headCall.url).pathname).toBe("/writing");
-    await Promise.all(pending);
     expect(views).toEqual([
       expect.objectContaining({ url: "https://ghaws.dev/writing", referrer: "https://ghaws.dev/" }),
     ]);
@@ -959,15 +990,28 @@ describe("handleRequest for POST /pv", () => {
 
     expect((await handleRequest(pingRequest("not json"), env, ctx, provider)).status).toBe(400);
     expect((await handleRequest(pingRequest({ url: "nope" }), env, ctx, provider)).status).toBe(400);
+    expect((await handleRequest(pingRequest({ url: "/\\evil.example/" }), env, ctx, provider)).status).toBe(400);
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
     expect(views).toEqual([]);
   });
 
-  it("returns 204 without tracking for a missing page, a cross-site post, or a bot", async () => {
+  it("does not track a page that is not in the assets", async () => {
+    const env = stubEnvWithPages();
+    const { ctx, pending } = stubCtx();
+    const { provider, views } = recordingProvider();
+
+    const response = await handleRequest(pingRequest({ url: "/missing" }), env, ctx, provider);
+
+    expect(response.status).toBe(204);
+    await Promise.all(pending);
+    expect(views).toEqual([]);
+  });
+
+  it("returns 204 without any background work for a cross-site post or a bot", async () => {
     const env = stubEnvWithPages();
     const { ctx } = stubCtx();
     const { provider, views } = recordingProvider();
 
-    const missing = await handleRequest(pingRequest({ url: "/missing" }), env, ctx, provider);
     const crossSite = await handleRequest(
       pingRequest({ url: "/writing" }, { "Sec-Fetch-Site": "cross-site" }),
       env,
@@ -981,8 +1025,9 @@ describe("handleRequest for POST /pv", () => {
       provider,
     );
 
-    expect([missing.status, crossSite.status, bot.status]).toEqual([204, 204, 204]);
+    expect([crossSite.status, bot.status]).toEqual([204, 204]);
     expect(ctx.waitUntil).not.toHaveBeenCalled();
+    expect(env.ASSETS.fetch).not.toHaveBeenCalled();
     expect(views).toEqual([]);
   });
 
@@ -1009,23 +1054,37 @@ Expected: FAIL, `PING_PATH`, `parsePing`, and `pageViewFromPing` are not exporte
 In `worker/index.ts`, add after the imports:
 
 ```ts
-/** Short and unremarkable on purpose: generic blocker rules match words like "track" or "collect". */
-export const PING_PATH = "/pv";
+/**
+ * Checked against EasyPrivacy and uBlock's lists: no rule matches a bare
+ * "/nav". Generic rules do match words like "track", "collect", and "pv".
+ */
+export const PING_PATH = "/nav";
 
 const MAX_PING_FIELD = 2000;
 
+/** A validated ping: `url` is the resolved site-relative path plus query. */
 export type Ping = { url: string; referrer: string | null };
 
-/** Validates a ping body. `url` must be a site-relative path; `referrer` is optional. */
-export function parsePing(body: unknown): Ping | null {
+/** Validates a ping body against the request's origin; `referrer` is optional. */
+export function parsePing(body: unknown, origin: string): Ping | null {
   if (typeof body !== "object" || body === null) return null;
   const { url, referrer } = body as Record<string, unknown>;
-  if (typeof url !== "string" || !url.startsWith("/") || url.startsWith("//")) return null;
-  if (url.length > MAX_PING_FIELD) return null;
+  if (typeof url !== "string" || url.length > MAX_PING_FIELD || !url.startsWith("/")) return null;
+  let resolved: URL;
+  try {
+    resolved = new URL(url, origin);
+  } catch {
+    return null;
+  }
+  // A prefix check is not enough: the URL parser reads "/\evil.example/" as another host.
+  if (resolved.origin !== origin) return null;
   if (referrer !== undefined && referrer !== null) {
     if (typeof referrer !== "string" || referrer.length > MAX_PING_FIELD) return null;
   }
-  return { url, referrer: typeof referrer === "string" && referrer !== "" ? referrer : null };
+  return {
+    url: resolved.pathname + resolved.search,
+    referrer: typeof referrer === "string" && referrer !== "" ? referrer : null,
+  };
 }
 
 /** The page view record for a client-side route change reported by the page. */
@@ -1047,8 +1106,9 @@ function badRequest(): Response {
 }
 
 /**
- * POST /pv from RouteTracker. The endpoint is public; the same-origin check is
- * a tripwire against casual cross-site posts, not security.
+ * POST /nav from RouteTracker. The endpoint is public; the same-origin check is
+ * a tripwire against casual cross-site posts, not security. Nothing waits on
+ * the 204, so the existence check runs with the tracking in the background.
  */
 async function handlePing(
   request: Request,
@@ -1063,23 +1123,29 @@ async function handlePing(
     } catch {
       return badRequest();
     }
-    const ping = parsePing(body);
+    const ping = parsePing(body, new URL(request.url).origin);
     if (ping === null) return badRequest();
 
     const site = request.headers.get("Sec-Fetch-Site");
     if (site !== null && site !== "same-origin") return noContent();
     if (isBot(request)) return noContent();
 
-    // Keep the "no 404s" rule: the page has to exist in the assets.
-    const page = new URL(ping.url, new URL(request.url).origin);
-    const head = await env.ASSETS.fetch(new Request(page.href, { method: "HEAD" }));
-    if (head.status !== 200 && head.status !== 304) return noContent();
-
-    ctx.waitUntil(provider.track(pageViewFromPing(request, ping)));
+    const view = pageViewFromPing(request, ping);
+    ctx.waitUntil(
+      (async () => {
+        // Keep the "no 404s" rule: the page has to exist in the assets.
+        const head = await env.ASSETS.fetch(new Request(view.url, { method: "HEAD" }));
+        if (head.status === 200 || head.status === 304) await provider.track(view);
+      })().catch(logPingError),
+    );
   } catch (error) {
-    console.error("analytics: ping failed", error);
+    logPingError(error);
   }
   return noContent();
+}
+
+function logPingError(error: unknown) {
+  console.error("analytics: ping failed", error);
 }
 ```
 
@@ -1102,7 +1168,7 @@ export async function handleRequest(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run worker/index.test.ts`
-Expected: PASS, 21 tests.
+Expected: PASS, 24 tests.
 
 - [ ] **Step 5: Confirm the assets binding answers HEAD, using the local preview**
 
@@ -1116,21 +1182,21 @@ npx wrangler dev --var ANALYTICS_PROVIDER:none
 Then:
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8787/pv \
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8787/nav \
   -H 'Content-Type: application/json' -H 'Sec-Fetch-Site: same-origin' \
   -H 'User-Agent: Mozilla/5.0 (Macintosh) Chrome/130.0' \
   -d '{"url":"/resume","referrer":"http://localhost:8787/"}'
-curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8787/pv \
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8787/nav \
   -H 'Content-Type: application/json' -d '{"url":"nope"}'
 curl -s -o /dev/null -w '%{http_code}\n' -I http://localhost:8787/resume
 ```
 
-Expected: `204`, `400`, `200`. The third line is a HEAD through the full stack. If the first curl returns 204 but wrangler's log shows `analytics: ping failed` with a 405 from the binding, the binding does not support HEAD: change the existence check in `handlePing` to
+Expected: `204`, `400`, `200`. The third line is a HEAD through the full stack. The existence check runs in the background, so a failure there shows only in wrangler's log: if the first curl returns 204 but the log shows `analytics: ping failed` with a 405, the binding does not support HEAD. In that case change the check inside `handlePing`'s `waitUntil` to
 
 ```ts
-    const head = await env.ASSETS.fetch(new Request(page.href, { method: "GET" }));
-    if (head.status !== 200 && head.status !== 304) return noContent();
-    await head.body?.cancel();
+        const head = await env.ASSETS.fetch(new Request(view.url, { method: "GET" }));
+        await head.body?.cancel();
+        if (head.status === 200 || head.status === 304) await provider.track(view);
 ```
 
 and update the `headCall.method` assertion in the test to `"GET"`. Stop wrangler dev when done.
@@ -1144,10 +1210,11 @@ Expected: all pass.
 git add worker/index.ts worker/index.test.ts
 git commit -m "Accept route-change pings on the Worker
 
-POST /pv takes a site-relative url and optional referrer from the page,
-confirms the page exists in the assets, drops cross-site posts and
-bots, and reports the view through the same provider as document
-loads.
+POST /nav takes a site-relative url and optional referrer from the
+page, validates the url by resolving it against the request origin,
+drops cross-site posts and bots, and in the background confirms the
+page exists in the assets before reporting the view through the same
+provider as document loads.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
@@ -1162,7 +1229,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Modify: `src/app/layout.tsx`
 
 **Interfaces:**
-- Consumes: the Worker's `POST /pv` contract from Task 4: JSON `{ url: string, referrer: string | null }`, where `url` is a site-relative path with query string.
+- Consumes: the Worker's `POST /nav` contract from Task 4: JSON `{ url: string, referrer: string | null }`, where `url` is a site-relative path with query string.
 - Produces: `RouteTracker` component, renders nothing.
 
 Read first: `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/use-pathname.md` and `node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md`. `usePathname` on a static route needs no Suspense boundary; `useSearchParams` would, which is why the query string is read from `window.location` inside the effect instead.
@@ -1206,7 +1273,7 @@ describe("RouteTracker", () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("/pv");
+    expect(url).toBe("/nav");
     expect(init.method).toBe("POST");
     expect(init.keepalive).toBe(true);
     expect(init.headers).toEqual({ "Content-Type": "application/json" });
@@ -1242,7 +1309,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 /** Must match PING_PATH in worker/index.ts. */
-const PING_PATH = "/pv";
+const PING_PATH = "/nav";
 
 /**
  * Reports client-side route changes to the Worker. The initial document load
@@ -1299,8 +1366,8 @@ and render it as the first child of `<body>`, before `<ThemeProvider>`:
 
 - [ ] **Step 6: Build and check the ping fires in the preview**
 
-Run: `npm run build`, then `npx wrangler dev --var ANALYTICS_PROVIDER:none`. Open `http://localhost:8787/` in a browser, open the Network panel, click "Writing" in the nav.
-Expected: one `POST /pv` with status 204 and body `{"url":"/writing","referrer":"http://localhost:8787/"}`. No console errors. Stop wrangler dev.
+Run: `npm run build`, then `npx wrangler dev --var ANALYTICS_PROVIDER:none`. Open `http://localhost:8787/` in a browser with uBlock Origin enabled, open the Network panel, click "Writing" in the nav.
+Expected: one `POST /nav` with status 204 and body `{"url":"/writing","referrer":"http://localhost:8787/"}`, not shown as blocked. No console errors. Stop wrangler dev.
 
 - [ ] **Step 7: Run the full check and commit**
 
@@ -1313,7 +1380,7 @@ git commit -m "Report client-side route changes to the Worker
 
 Internal links use next/link, so only the landing page is a document
 load. A client component watches the pathname and POSTs each change to
-/pv on the site's own origin, which ad blockers do not touch.
+/nav on the site's own origin, which ad blockers do not touch.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
@@ -1490,14 +1557,14 @@ Add a new section before "Deployment (Cloudflare, free tier)":
 ```markdown
 ## Analytics
 
-Page views are recorded at the edge, not by a script in the browser. The Worker in `worker/` runs in front of the static assets for every path outside `/_next/`, serves the asset unchanged, and then reports document loads (and `/resume.pdf`) to an analytics provider in the background. Internal links navigate client-side, so `RouteTracker` in the layout POSTs each route change to the Worker at `/pv` on the site's own origin. Nothing loads from a third-party host, so ad blockers have nothing to block. The provider is one function behind `createProvider` in `worker/provider.ts`; the first is Umami Cloud's free plan.
+Page views are recorded at the edge, not by a third-party script. The Worker in `worker/` runs in front of the static assets for every path outside `/_next/`, serves the asset unchanged, and then reports document loads (and `/resume.pdf`) to an analytics provider in the background. Internal links navigate client-side, so `RouteTracker` in the layout POSTs each route change to the Worker at `/nav` on the site's own origin. Nothing loads from a third-party host and the path matches no rule in EasyPrivacy or uBlock's lists, so ad blockers have nothing to block. The provider is one function behind `createProvider` in `worker/provider.ts`; the first is Umami Cloud's free plan.
 
 One-time setup:
 
 1. Create a free account at umami.is, add a website for `ghaws.dev`, and copy its website ID.
 2. Paste the ID into `UMAMI_WEBSITE_ID` in `wrangler.jsonc`. With it empty, the Worker serves the site and tracks nothing.
-3. Umami's docs give `https://gateway.umami.is/api/send` as the Cloud endpoint. Open the website's tracking-code snippet in the dashboard; if the script host differs, set `UMAMI_ENDPOINT` in `wrangler.jsonc` to that host plus `/api/send`.
-4. Push to `main`. Then verify: visit the site with and without an ad blocker and confirm both show in Umami with the correct country (check from a phone on cellular or a VPN exit abroad; a visit that merely shows some country could be the Worker's own address). Reload once and confirm the repeat shows. Click to a second page without reloading and confirm it appears. Open the PDF and confirm `/resume.pdf` appears.
+3. The default endpoint is `https://gateway.umami.is/api/send`, the host Umami's sending-stats docs give for Cloud. The dashboard's tracking snippet loads its script from `cloud.umami.is`. If events do not arrive after the next step, set `UMAMI_ENDPOINT` in `wrangler.jsonc` to `https://cloud.umami.is/api/send`.
+4. Push to `main`. Then verify: visit the site with and without an ad blocker and confirm both show in Umami with the correct country (check from a phone on cellular or a VPN exit abroad; a visit that merely shows some country could be the Worker's own address). Reload once and confirm the repeat shows. With uBlock Origin enabled, click to a second page without reloading and confirm it appears and the `/nav` request is not blocked. Open the PDF and confirm `/resume.pdf` appears.
 
 If visits show the wrong country, Umami is ignoring the `ip` payload field. In `worker/providers/umami.ts`, add an `x-umami-client-ip` header set to `view.ip`; Umami Cloud reads that header before any other IP header.
 
@@ -1550,8 +1617,8 @@ These need the owner's accounts and cannot be done by an agent. Report them as t
 
 ## Self-review
 
-**Spec coverage.** Routing and config: Task 1. Provider interface, factory, no-op, warn-once: Task 1. Umami provider, timeout, payload, empty referrer, language omitted when null: Task 2. Document-load rules including 304, PDF, Accept fallback, prefetch, bots, `/_next/`, 404s, and the try/catch invariant: Task 3. Ping endpoint with validation, same-origin tripwire, existence check, bot drop, 400 and 204 responses: Task 4. RouteTracker with first-render skip, previous page as referrer, query string from `window.location`, keepalive: Task 5. Resume tag for both media and regeneration: Task 6. Preview override, README setup with the endpoint-host and correct-country checks, tagging table, profile links, swap instructions, and the `x-umami-client-ip` fallback: Task 7. CSP untouched: no task edits `public/_headers`.
+**Spec coverage.** Routing and config: Task 1. Provider interface, factory, no-op, warn-once: Task 1. Umami provider, timeout, payload, empty referrer, language omitted when null: Task 2. Document-load rules including 304, PDF, Accept fallback, prefetch, bots and empty user agents, `/_next/`, 404s, the language cap, and the try/catch invariant including provider construction: Task 3. Ping endpoint with origin-resolved validation, same-origin tripwire, background existence check, bot drop, 400 and 204 responses: Task 4. RouteTracker with first-render skip, previous page as referrer, query string from `window.location`, keepalive: Task 5. Resume tag for both media and regeneration: Task 6. Preview override, README setup with the endpoint-host and correct-country checks, tagging table, profile links, swap instructions, and the `x-umami-client-ip` fallback: Task 7. CSP untouched: no task edits `public/_headers`.
 
 **Placeholder scan.** None. The only literal placeholder is the empty `UMAMI_WEBSITE_ID`, which the owner fills.
 
-**Type consistency.** `PageView` fields (`url`, `hostname`, `referrer`, `userAgent`, `ip`, `language`) match across the provider, the Umami payload, `pageViewFrom`, `pageViewFromPing`, and every test. `Provider.track(view): Promise<void>` matches the recording provider and the sync-throwing provider in the invariant test. `handleRequest(request, env, ctx, provider)` keeps the same signature in Tasks 3 and 4. `contactItems(site, medium)` with `ResumeMedium` matches both call sites and tests. `PING_PATH` is `"/pv"` in the Worker and in `RouteTracker`.
+**Type consistency.** `PageView` fields (`url`, `hostname`, `referrer`, `userAgent`, `ip`, `language`) match across the provider, the Umami payload, `pageViewFrom`, `pageViewFromPing`, and every test. `Provider.track(view): Promise<void>` matches the recording provider and the sync-throwing provider in the invariant test. `handleRequest(request, env, ctx, provider)` keeps the same signature in Tasks 3 and 4. `parsePing(body, origin)` takes the origin in both its tests and `handlePing`. `contactItems(site, medium)` with `ResumeMedium` matches both call sites and tests. `PING_PATH` is `"/nav"` in the Worker and in `RouteTracker`.
