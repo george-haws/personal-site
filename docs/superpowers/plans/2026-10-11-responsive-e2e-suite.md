@@ -1407,3 +1407,15 @@ npm run check && npm run test:e2e 2>&1 | tail -3
 ```
 
 Expected: check passes with the new unit tests (85 or more), and the suite reports `180 passed`.
+
+## Verification log (filled in during Task 10)
+
+Run on a scratch branch off `responsive-e2e-suite` at 86175eb. Every scripted edit passed its `git diff --quiet` guard, and every file was restored with `git checkout` before the next row.
+
+| Revert | Failing test | Message excerpt |
+|---|---|---|
+| A projects grid | `[desktop-1440] demo.spec.ts › terminal demo is reachable and signals overflow on /projects` (1 failed, 1 passed) | `toHaveAttribute` on `data-overflow`: `Expected: "false"`, `Received: "true"` |
+| B nav tap targets | `[phone-375] layout.spec.ts › layout holds on <route>` for all 7 routes (7 failed) | `site chrome targets under 24px`: `"About: 42x18"`, `"Writing: 58.8125x18"`, `"Resume: 50.40625x18"` |
+| C brand | `[phone-320] layout.spec.ts › layout holds on <route>` for all 7 routes (7 failed) | Overflow, not wrap. `layout viewport widened past the device width` (`Expected: <= 321`, `Received: 328`), `elements past the viewport edge` (`div.ml-4 right=328.03`, `button.group/button.inline-flex.shrink-0 right=328.03`), and `document scrolls horizontally`, on every route. `header wraps onto more than one row` did not fire. |
+| D scroll region focus | `[phone-375] demo.spec.ts › terminal demo ... on /` and `... on /projects`; `[phone-375] a11y.spec.ts › light theme` and `› dark theme › axe passes on` `/`, `/projects`, `/writing/fast-validation-for-ai-driven-development` (8 failed, 8 passed) | Demo: `toHaveAttribute` on `tabindex`, `Expected: "0"`, `Received: ""`. Axe: `scrollable-region-focusable (serious): .overflow-x-auto`. The article page fails too because MDX tables render through `ScrollRegion` (`src/mdx-components.tsx`). |
+| E heading level | `[desktop-1440] demo.spec.ts › terminal demo ... on /projects`; `[desktop-1440] a11y.spec.ts › light theme` and `› dark theme › axe passes on /projects` (3 failed, 13 passed) | Demo: `toBeVisible` failed for `getByRole('heading', { name: 'Claude Code status line', level: 2 })`. Axe: `heading-order (moderate): h3` |
