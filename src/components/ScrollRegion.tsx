@@ -45,6 +45,7 @@ export function ScrollRegion({ label, children }: { label: string; children: Rea
       </div>
       <div
         aria-hidden="true"
+        data-slot="scroll-fade"
         className={cn(
           "pointer-events-none absolute inset-y-px right-0 w-10 bg-linear-to-l from-muted to-transparent transition-opacity",
           overflow ? "opacity-100" : "opacity-0",

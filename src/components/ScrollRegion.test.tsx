@@ -52,4 +52,14 @@ describe("ScrollRegion", () => {
     });
     expect(region).toHaveAttribute("data-overflow", "false");
   });
+
+  it("marks the fade so browser tests can find it", () => {
+    fakeGeometry(100, 100);
+    const { container } = render(
+      <ScrollRegion label="Sample output">
+        <pre>hello</pre>
+      </ScrollRegion>,
+    );
+    expect(container.querySelector('[data-slot="scroll-fade"]')).not.toBeNull();
+  });
 });
