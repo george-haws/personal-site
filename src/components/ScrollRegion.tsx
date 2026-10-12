@@ -40,7 +40,7 @@ export function ScrollRegion({ label, children }: { label: string; children: Rea
         tabIndex={0}
         data-overflow={overflow ?? undefined}
         onScroll={measure}
-        className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        className="overflow-x-auto outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2 focus-visible:outline-ring"
       >
         {children}
       </div>
