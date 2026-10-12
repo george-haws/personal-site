@@ -1,6 +1,6 @@
 # Personal site
 
-Static site built with Next.js (static export), styled by Pico CSS, deployed to Cloudflare.
+Static site built with Next.js (static export), styled with Tailwind, deployed to Cloudflare.
 
 ## Editing content
 
@@ -20,7 +20,7 @@ The PDF is printed by your installed Google Chrome; nothing is downloaded. `docs
 
 ## Styling
 
-There is none of our own. Components are bare semantic HTML and the classless build of [Pico CSS](https://picocss.com) provides the look, including dark mode from the OS setting. To restyle the site later, remove the Pico import in `src/app/layout.tsx` and add whatever comes next. The markup stays.
+Tailwind v4 with shadcn primitives; theme tokens live in `src/app/globals.css` and the dark mode class is set by next-themes.
 
 ## Local development
 
@@ -29,6 +29,30 @@ There is none of our own. Components are bare semantic HTML and the classless bu
     npm run check      # typecheck + lint + tests
     npm run build      # static export to out/
     npm run resume     # regenerate the resume Markdown and PDF
+
+## Browser tests
+
+`npm run test:e2e` builds the static export, serves it with `wrangler dev`, and runs
+Playwright against six device profiles (320 and 375 phones, iPhone 15, 768 tablet, 1024
+laptop, 1440 desktop). Routes come from `out/`, so a new page is covered as soon as it
+builds. The suite asserts layout invariants rather than screenshots: no horizontal
+overflow, header on one row, site chrome tap targets of at least 24px, no text under
+12px, zero axe violations with the WCAG 2.2 target-size rule on, and that the terminal
+demo is keyboard-reachable and signals when it scrolls.
+
+Locally it drives your installed Chrome and downloads nothing. `npm run deploy` runs it
+before shipping. It is not part of `npm run check`, because Cloudflare's build has no
+browser. `npm run test:e2e:ui` opens Playwright's UI against the last build.
+
+To run it in GitHub Actions later: check out, set up Node 24, `npm ci`,
+`npx playwright install --with-deps chromium`, then `CI=1 npm run test:e2e`, and upload
+`test-results/` on failure. The config and tests need no changes; `CI` switches the
+browser to Playwright's Chromium, adds one retry, forbids `test.only`, and stops reusing
+a running server.
+
+`scripts/audit-responsive.ts` shares the measurement code with the suite and produces
+screenshots plus a `results.json` for a one-off review of any URL:
+`npm run audit:responsive -- --base https://ghaws.dev`.
 
 ## Deployment (Cloudflare, free tier)
 
