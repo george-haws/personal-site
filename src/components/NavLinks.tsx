@@ -5,6 +5,7 @@ const navItems = [
   { href: "/", label: "About" },
   { href: "/writing", label: "Writing" },
   { href: "/resume", label: "Resume" },
+  { href: "/projects", label: "Projects" },
 ] as const;
 
 function isActive(href: string, currentPath: string): boolean {

@@ -3,17 +3,18 @@ import { describe, it, expect } from "vitest";
 import { NavLinks } from "@/components/NavLinks";
 
 describe("NavLinks", () => {
-  it("renders the three routes", () => {
+  it("renders the four routes", () => {
     render(<NavLinks currentPath="/" />);
     expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Writing" })).toHaveAttribute("href", "/writing");
     expect(screen.getByRole("link", { name: "Resume" })).toHaveAttribute("href", "/resume");
+    expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("href", "/projects");
   });
 
-  it("orders the links About, Writing, Resume", () => {
+  it("orders the links About, Writing, Resume, Projects", () => {
     render(<NavLinks currentPath="/" />);
     const labels = screen.getAllByRole("link").map((link) => link.textContent);
-    expect(labels).toEqual(["About", "Writing", "Resume"]);
+    expect(labels).toEqual(["About", "Writing", "Resume", "Projects"]);
   });
 
   it("marks the writing link current on a post page", () => {
@@ -22,9 +23,10 @@ describe("NavLinks", () => {
     expect(screen.getByRole("link", { name: "About" })).not.toHaveAttribute("aria-current");
   });
 
-  it("hides the projects link", () => {
-    render(<NavLinks currentPath="/" />);
-    expect(screen.queryByRole("link", { name: "Projects" })).toBeNull();
+  it("marks the projects link current on /projects", () => {
+    render(<NavLinks currentPath="/projects" />);
+    expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "About" })).not.toHaveAttribute("aria-current");
   });
 
   it("marks only the home link current on /", () => {
