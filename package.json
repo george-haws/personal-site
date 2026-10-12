@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "preview": "npm run build && wrangler dev --var ANALYTICS_PROVIDER:none",
     "lint": "eslint",
     "typecheck": "tsc --noEmit && tsc -p worker",
     "types": "wrangler types worker/worker-configuration.d.ts --strict-vars=false",
