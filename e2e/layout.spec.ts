@@ -39,13 +39,13 @@ for (const route of routes) {
     expect.soft(small, "site chrome targets under 24px").toEqual([]);
 
     // 3. Header present and on one row.
-    const centres = header.filter((m) => m.box).map((m) => m.box!.y + m.box!.height / 2);
+    const boxed = header.filter((m) => m.box);
+    const centres = boxed.map((m) => m.box!.y + m.box!.height / 2);
     expect.soft(centres.length, "no visible header items found").toBeGreaterThan(0);
     if (centres.length > 0) {
       const spread = Math.max(...centres) - Math.min(...centres);
-      expect
-        .soft(spread, `header wraps onto more than one row (centres: ${header.map((m, i) => `${m.label}=${centres[i]?.toFixed(1)}`).join(", ")})`)
-        .toBeLessThanOrEqual(2);
+      const placed = boxed.map((m, i) => `${m.label}=${centres[i].toFixed(1)}`).join(", ");
+      expect.soft(spread, `header wraps onto more than one row (centres: ${placed})`).toBeLessThanOrEqual(2);
     }
 
     // 4. Readable text.
