@@ -7,8 +7,8 @@
     "directory": "./out",
     "not_found_handling": "404-page",
     "binding": "ASSETS",
-    // Next's build output stays asset-first; every other path runs the Worker.
-    "run_worker_first": ["/*", "!/_next/*"]
+    // Pages and the PDF run the Worker; Next's RSC payloads, icons, and crawler files stay asset-first and free.
+    "run_worker_first": ["/*", "!/_next/*", "!/*.txt", "!/*.ico", "!/*.png", "!/*.svg", "!/*.xml"]
   },
   "vars": {
     // "umami" or "none". The Worker disables tracking when the website ID is empty.

@@ -69,6 +69,14 @@ describe("umamiProvider", () => {
     expect("language" in payload).toBe(false);
   });
 
+  it("falls back to the default endpoint when the endpoint is empty", async () => {
+    const fetchMock = stubFetch(new Response("{}", { status: 200 }));
+    await umamiProvider({ websiteId: "site-1", endpoint: "" }).track(view);
+
+    const [url] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(DEFAULT_UMAMI_ENDPOINT);
+  });
+
   it("logs and resolves on a non-2xx response", async () => {
     stubFetch(new Response("nope", { status: 400 }));
     const error = vi.spyOn(console, "error").mockImplementation(() => {});

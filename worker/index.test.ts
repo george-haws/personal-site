@@ -7,6 +7,8 @@ import type { Provider } from "./provider";
 
 const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 Chrome/130.0 Safari/537.36";
 const CRAWLER = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+const LINKEDIN_APP =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [LinkedInApp]";
 
 function documentRequest(path: string, init: { method?: string; headers?: Record<string, string> } = {}) {
   return new Request(`https://ghaws.dev${path}`, {
@@ -111,6 +113,10 @@ describe("isTrackable", () => {
     expect(isTrackable(documentRequest("/", { headers: { Purpose: "prefetch" } }), ok)).toBe(false);
   });
 
+  it("tracks LinkedIn's in-app browser, where most recruiter clicks land", () => {
+    expect(isTrackable(documentRequest("/", { headers: { "User-Agent": LINKEDIN_APP } }), ok)).toBe(true);
+  });
+
   it("does not track bots or requests without a user agent", () => {
     expect(isTrackable(documentRequest("/", { headers: { "User-Agent": CRAWLER } }), ok)).toBe(false);
     const anonymous = new Request("https://ghaws.dev/", { headers: { "Sec-Fetch-Dest": "document" } });
@@ -188,6 +194,21 @@ describe("handleRequest", () => {
     };
 
     const response = await handleRequest(documentRequest("/"), env, ctx, provider);
+
+    expect(response).toBe(assetResponse);
+    expect(error).toHaveBeenCalledOnce();
+  });
+
+  it("still returns the asset response when tracking rejects in the background", async () => {
+    const { env, assetResponse } = stubEnv();
+    const { ctx, pending } = stubCtx();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const provider: Provider = {
+      track: () => Promise.reject(new Error("boom")),
+    };
+
+    const response = await handleRequest(documentRequest("/"), env, ctx, provider);
+    await Promise.all(pending);
 
     expect(response).toBe(assetResponse);
     expect(error).toHaveBeenCalledOnce();

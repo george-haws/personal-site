@@ -23,6 +23,8 @@ export function RouteTracker() {
 
     const referrer = last.current.href;
     last.current = { pathname, href: window.location.href };
+    // No Worker runs in front of `next dev`, so a ping would only 404.
+    if (process.env.NODE_ENV === "development") return;
     const body = JSON.stringify({ url: pathname + window.location.search, referrer });
     fetch(PING_PATH, {
       method: "POST",

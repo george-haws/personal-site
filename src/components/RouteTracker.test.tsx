@@ -15,6 +15,7 @@ describe("RouteTracker", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
@@ -42,6 +43,16 @@ describe("RouteTracker", () => {
   it("sends nothing on a re-render with the same pathname", () => {
     const { rerender } = render(<RouteTracker />);
     rerender(<RouteTracker />);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends nothing under next dev, where no Worker is in front", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const { rerender } = render(<RouteTracker />);
+
+    vi.mocked(usePathname).mockReturnValue("/writing");
+    rerender(<RouteTracker />);
+
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

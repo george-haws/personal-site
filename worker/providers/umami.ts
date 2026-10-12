@@ -12,7 +12,8 @@ export type UmamiOptions = { websiteId: string; endpoint?: string };
  * device, UTM tags, and unique visitors from the fields sent here.
  */
 export function umamiProvider(options: UmamiOptions): Provider {
-  const endpoint = options.endpoint ?? DEFAULT_UMAMI_ENDPOINT;
+  // An empty var means "not set", the same as a missing one.
+  const endpoint = options.endpoint || DEFAULT_UMAMI_ENDPOINT;
   return {
     async track(view: PageView) {
       try {
