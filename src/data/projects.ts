@@ -4,9 +4,9 @@ export const projects: Project[] = [
   {
     title: "expo-whisperkit",
     summary:
-      "On-device speech to text for Expo apps on iOS. Models download on demand, transcription runs offline, and every failure carries a typed code.",
+      "On-device speech to text for Expo apps on iOS, written because the only community wrapper was 40 lines of Swift on a two-year-old WhisperKit pin, and packaging cost the same either way.",
     description:
-      "An Expo module around Argmax's WhisperKit. The config plugin adds two pods that build WhisperKit from source, so apps need no CocoaPods plugin or Ruby gem. The API covers push-to-talk, file transcription, and streaming with partial results. A manifest pins each model to a repo commit and per-file hash, and every download is verified before it counts as present, so an upstream change fails loudly instead of silently changing what the app runs. Phone calls, Siri, and backgrounding end capture without an error and keep the audio for the next stop.",
+      "I wanted a pinned model downloaded from Settings with progress, a vocabulary prompt to bias toward cooking terms, live streaming, typed errors, and a fork to own when something broke. The existing wrapper offered one transcribe call on WhisperKit's default model, a boolean for errors, and none of the rest. Either route still had to wire WhisperKit into the iOS build through a config plugin, so the wrapper saved half a day of Swift and nothing else. This module's plugin builds WhisperKit from source with no CocoaPods plugin or Ruby gem. The API covers push-to-talk, file transcription, and streaming with partial results. A manifest pins each model to a repo commit and per-file hash, and every download is verified before it counts as present, so an upstream change fails loudly instead of silently changing what the app runs. Phone calls, Siri, and backgrounding end capture without an error and keep the audio for the next stop.",
     tech: ["TypeScript", "Swift", "Expo Modules", "WhisperKit", "CoreML", "Maestro"],
     repoUrl: "https://github.com/george-haws/expo-whisperkit",
     demo: [
