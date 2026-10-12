@@ -18,13 +18,13 @@ describe("useMDXComponents", () => {
     expect(screen.getByText("Body text")).toHaveClass("max-w-prose", "text-sm", "leading-relaxed");
   });
 
-  it("styles links like the rest of the site", () => {
+  it("underlines prose links so colour is not the only cue", () => {
     const A = components.a!;
     render(<A href="/x">Go</A>);
-    expect(screen.getByRole("link", { name: "Go" })).toHaveClass("text-primary", "hover:underline");
+    expect(screen.getByRole("link", { name: "Go" })).toHaveClass("text-primary", "underline");
   });
 
-  it("wraps tables so they can scroll on narrow screens", () => {
+  it("wraps tables in a keyboard-reachable scroll region", () => {
     const Table = components.table!;
     render(
       <Table>
@@ -37,7 +37,10 @@ describe("useMDXComponents", () => {
     );
     const table = screen.getByRole("table");
     expect(table).toHaveClass("w-full", "text-sm");
-    expect(table.parentElement).toHaveClass("overflow-x-auto");
+    const region = screen.getByRole("region", { name: "Scrollable table" });
+    expect(region).toHaveClass("overflow-x-auto");
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toContainElement(table);
   });
 
   it("styles table headers and cells with theme borders", () => {

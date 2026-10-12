@@ -1,5 +1,6 @@
 import type { MDXComponents } from "mdx/types";
 import type { ComponentPropsWithoutRef } from "react";
+import { ScrollRegion } from "@/components/ScrollRegion";
 
 const components = {
   h2: (props: ComponentPropsWithoutRef<"h2">) => (
@@ -14,8 +15,9 @@ const components = {
   strong: (props: ComponentPropsWithoutRef<"strong">) => (
     <strong className="font-semibold text-foreground" {...props} />
   ),
+  // Links inside running prose stay underlined: colour alone does not mark them (WCAG 1.4.1).
   a: (props: ComponentPropsWithoutRef<"a">) => (
-    <a className="text-primary hover:underline" {...props} />
+    <a className="text-primary underline underline-offset-4" {...props} />
   ),
   ol: (props: ComponentPropsWithoutRef<"ol">) => (
     <ol className="mt-4 max-w-prose list-decimal space-y-2 pl-6" {...props} />
@@ -24,8 +26,10 @@ const components = {
     <li className="text-sm leading-relaxed" {...props} />
   ),
   table: (props: ComponentPropsWithoutRef<"table">) => (
-    <div className="mt-6 overflow-x-auto">
-      <table className="w-full border-collapse text-sm" {...props} />
+    <div className="mt-6">
+      <ScrollRegion label="Scrollable table">
+        <table className="w-full border-collapse text-sm" {...props} />
+      </ScrollRegion>
     </div>
   ),
   th: (props: ComponentPropsWithoutRef<"th">) => (
